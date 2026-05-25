@@ -140,6 +140,33 @@ export interface CausalEdge {
   evidence: string | null;
 }
 
+export type TaskJourneyExitType = "next_prompt" | "session_end";
+
+export interface TaskJourneyStage {
+  lane: TimelineLane;
+  count: number;
+  status: EventStatus;
+  firstEventId: string;
+  lastEventId: string;
+  eventIds: string[];
+}
+
+export interface TaskJourney {
+  id: string;
+  projectId: string;
+  sessionId: string;
+  promptEventId: string;
+  startedAt: string;
+  endedAt: string;
+  title: string;
+  summary: string;
+  status: EventStatus;
+  exitType: TaskJourneyExitType;
+  eventIds: string[];
+  stageCounts: Partial<Record<TimelineLane, number>>;
+  stages: TaskJourneyStage[];
+}
+
 export interface Artifact {
   id: string;
   eventId: string;
@@ -192,6 +219,7 @@ export interface ProjectTimeline {
   episodes: Episode[];
   events: TimelineEvent[];
   causalEdges: CausalEdge[];
+  taskJourneys: TaskJourney[];
   totalEvents?: number;
   limit?: number;
   offset?: number;

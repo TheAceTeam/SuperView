@@ -1,11 +1,10 @@
 import { AlertTriangle, ChevronRight, Database, FileText, GitBranch, Moon, Pause, Play, RotateCw, Search, Sun, TerminalSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, ReplayNode, RunReplay, TimelineEvent } from "../../core/types";
+import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, ReplayNode, RunReplay, TaskJourney, TaskJourneyStage, TimelineEvent } from "../../core/types";
 import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchRun, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
 
-const LANES = ["Product", "Architecture", "Code", "Agent Runs", "Verification", "Risks"];
 const SEMANTIC_LANES = ["Product", "Architecture", "Code", "Verification", "Risks"];
 const TIMELINE_LIMIT = 300;
 const LANE_RENDER_LIMIT = 28;
@@ -159,15 +158,7 @@ export function App() {
   }
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
-  const eventsByLane = useMemo(() => {
-    const groups = new Map<string, TimelineEvent[]>();
-    for (const lane of LANES) groups.set(lane, []);
-    for (const event of timeline?.events ?? []) {
-      groups.get(event.lane)?.push(event);
-    }
-    return groups;
-  }, [timeline]);
-  const traceEvents = eventsByLane.get("Agent Runs") ?? [];
+  const eventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
 
   const drawerEvent = selectedNode ? selectedRun?.events.find((event) => event.id === selectedNode.eventId) ?? selectedEvent : selectedEvent;
   const drawerEvidence = eventEvidence?.event.id === drawerEvent?.id ? eventEvidence : null;
@@ -212,12 +203,12 @@ export function App() {
           <div>
             <p className="eyebrow">Project Timeline</p>
             <h1>{selectedProject?.name ?? "No project indexed yet"}</h1>
-            <p className="lead">From Codex session logs to engineering episodes, evidence, hazards, and replayable agent runs.</p>
+            <p className="lead">From each user input to exit: intent, design, code, verification, risk, and agent trace.</p>
           </div>
           <div className="status-cluster">
             <Metric label="Projects" value={projects.length} />
             <Metric label="Events" value={totalEvents} />
-            <Metric label="Episodes" value={timeline?.episodes.length ?? 0} />
+            <Metric label="Tasks" value={timeline?.taskJourneys.length ?? 0} />
           </div>
         </section>
 
@@ -257,11 +248,11 @@ export function App() {
             <section className="timeline-panel">
               <div className="panel-heading">
                 <FileText size={17} />
-                <span>Engineering Timeline</span>
+                <span>Task Journeys</span>
                 <em>{timelineOffset + 1}-{pageEnd} of {totalEvents}</em>
               </div>
               <div className="timeline-controls">
-                <span>{timeline?.events.length ?? 0} events loaded, semantic lane dots capped at {LANE_RENDER_LIMIT} each</span>
+                <span>{timeline?.taskJourneys.length ?? 0} task journeys loaded from {timeline?.events.length ?? 0} events</span>
                 <div>
                   <button className={`secondary-button ${showCausalPaths ? "active" : ""}`} onClick={() => setShowCausalPaths((current) => !current)}>
                     <GitBranch size={15} />
@@ -272,47 +263,17 @@ export function App() {
                 </div>
               </div>
               {showCausalPaths ? <CausalRibbon view={causalView} /> : null}
-              <div className="episode-strip">
-                {(timeline?.episodes ?? []).map((episode) => (
-                  <button key={episode.id} className={`episode ${episode.status}`} onClick={() => setSelectedEvent(timeline?.events.find((event) => event.id === episode.eventIds[0]) ?? null)}>
-                    <strong>{episode.title}</strong>
-                    <span>{episode.summary}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="lanes">
-                {SEMANTIC_LANES.map((lane) => (
-                  <div className="lane" key={lane}>
-                    <div className="lane-label">
-                      <span>{lane}</span>
-                      <small>{eventsByLane.get(lane)?.length ?? 0}</small>
-                    </div>
-                    <div className="lane-track">
-                      {(eventsByLane.get(lane) ?? []).slice(0, LANE_RENDER_LIMIT).map((event) => (
-                        <button
-                          key={event.id}
-                          className={eventDotClass(event, drawerEvent?.id ?? null, causalView, showCausalPaths)}
-                          title={event.title}
-                          data-event-id={event.id}
-                          onClick={() => {
-                            setSelectedNode(null);
-                            setSelectedEvent(event);
-                          }}
-                        >
-                          <span>{shortLabel(event.title)}</span>
-                        </button>
-                      ))}
-                      {(eventsByLane.get(lane)?.length ?? 0) > LANE_RENDER_LIMIT ? (
-                        <span className="lane-overflow">+{(eventsByLane.get(lane)?.length ?? 0) - LANE_RENDER_LIMIT} more on this page</span>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <AgentTraceRail events={traceEvents} selectedEventId={drawerEvent?.id ?? null} causalView={causalView} showCausalPaths={showCausalPaths} onSelectEvent={(event) => {
-                setSelectedNode(null);
-                setSelectedEvent(event);
-              }} />
+              <TaskJourneyList
+                journeys={timeline?.taskJourneys ?? []}
+                eventsById={eventsById}
+                selectedEventId={drawerEvent?.id ?? null}
+                causalView={causalView}
+                showCausalPaths={showCausalPaths}
+                onSelectEvent={(event) => {
+                  setSelectedNode(null);
+                  setSelectedEvent(event);
+                }}
+              />
 
               {selectedRun ? (
                 <RunReplayPanel
@@ -440,6 +401,102 @@ function CausalRibbon({ view }: { view: CausalView }) {
   );
 }
 
+function TaskJourneyList({
+  journeys,
+  eventsById,
+  selectedEventId,
+  causalView,
+  showCausalPaths,
+  onSelectEvent
+}: {
+  journeys: TaskJourney[];
+  eventsById: Map<string, TimelineEvent>;
+  selectedEventId: string | null;
+  causalView: CausalView;
+  showCausalPaths: boolean;
+  onSelectEvent: (event: TimelineEvent) => void;
+}) {
+  if (journeys.length === 0) {
+    return <p className="muted">No user-input task journeys are visible on this page.</p>;
+  }
+
+  return (
+    <div className="task-journeys">
+      {journeys.map((journey, index) => {
+        const prompt = eventsById.get(journey.promptEventId);
+        const traceStage = journey.stages.find((stage) => stage.lane === "Agent Runs");
+        const traceEvents = (traceStage?.eventIds ?? []).map((eventId) => eventsById.get(eventId)).filter((event): event is TimelineEvent => Boolean(event));
+        return (
+          <article className={`task-journey ${journey.status}`} key={journey.id}>
+            <button className="task-journey-header" onClick={() => prompt ? onSelectEvent(prompt) : undefined}>
+              <span className="task-index">#{index + 1}</span>
+              <span>
+                <small>Input to exit</small>
+                <strong>{journey.title}</strong>
+              </span>
+              <em>{formatExitType(journey.exitType)}</em>
+            </button>
+            <div className="journey-meta">
+              <span>{journey.eventIds.length} events</span>
+              <span>{journey.stages.length} stages</span>
+              <span>{formatDate(journey.startedAt)} - {formatDate(journey.endedAt)}</span>
+            </div>
+            <div className="journey-stages">
+              {SEMANTIC_LANES.map((lane) => {
+                const stage = journey.stages.find((candidate) => candidate.lane === lane);
+                return <JourneyStage key={lane} lane={lane} stage={stage} eventsById={eventsById} selectedEventId={selectedEventId} causalView={causalView} showCausalPaths={showCausalPaths} onSelectEvent={onSelectEvent} />;
+              })}
+            </div>
+            <AgentTraceRail events={traceEvents} selectedEventId={selectedEventId} causalView={causalView} showCausalPaths={showCausalPaths} onSelectEvent={onSelectEvent} />
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function JourneyStage({
+  lane,
+  stage,
+  eventsById,
+  selectedEventId,
+  causalView,
+  showCausalPaths,
+  onSelectEvent
+}: {
+  lane: string;
+  stage: TaskJourneyStage | undefined;
+  eventsById: Map<string, TimelineEvent>;
+  selectedEventId: string | null;
+  causalView: CausalView;
+  showCausalPaths: boolean;
+  onSelectEvent: (event: TimelineEvent) => void;
+}) {
+  const events = (stage?.eventIds ?? []).map((eventId) => eventsById.get(eventId)).filter((event): event is TimelineEvent => Boolean(event));
+  return (
+    <div className={`journey-stage ${stage?.status ?? "unknown"}`}>
+      <div className="lane-label">
+        <span>{lane}</span>
+        <small>{stage?.count ?? 0}</small>
+      </div>
+      <div className="lane-track">
+        {events.slice(0, LANE_RENDER_LIMIT).map((event) => (
+          <button
+            key={event.id}
+            className={eventDotClass(event, selectedEventId, causalView, showCausalPaths)}
+            title={event.title}
+            data-event-id={event.id}
+            onClick={() => onSelectEvent(event)}
+          >
+            <span>{shortLabel(event.title)}</span>
+          </button>
+        ))}
+        {events.length > LANE_RENDER_LIMIT ? <span className="lane-overflow">+{events.length - LANE_RENDER_LIMIT} more in stage</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function AgentTraceRail({
   events,
   selectedEventId,
@@ -476,6 +533,10 @@ function AgentTraceRail({
       </div>
     </section>
   );
+}
+
+function formatExitType(exitType: TaskJourney["exitType"]) {
+  return exitType === "next_prompt" ? "Next input" : "Session end";
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

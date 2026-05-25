@@ -65,6 +65,7 @@ describe("SuperView API", () => {
     expect(timeline.body.offset).toBe(1);
     expect(timeline.body.episodes.length).toBeGreaterThan(0);
     expect(Array.isArray(timeline.body.causalEdges)).toBe(true);
+    expect(Array.isArray(timeline.body.taskJourneys)).toBe(true);
 
     const evidenceEvent = timeline.body.events.find((event: { rawEventRefId: string | null }) => event.rawEventRefId);
     expect(evidenceEvent).toBeTruthy();
@@ -94,6 +95,16 @@ describe("SuperView API", () => {
           toEventId: patchedCall.outputEventId,
           type: "same_call",
           confidence: "deterministic"
+        })
+      ])
+    );
+    expect(fullTimeline.body.taskJourneys).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          promptEventId: expect.any(String),
+          title: expect.any(String),
+          eventIds: expect.any(Array),
+          stages: expect.any(Array)
         })
       ])
     );

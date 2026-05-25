@@ -1,5 +1,5 @@
 import { addMinutes, differenceInMinutes, isValid, parseISO } from "date-fns";
-import { CausalConfidence, CausalEdge, CausalEdgeType, Episode, EventStatus, ProjectRecord, ProjectTimeline, TimelineEvent } from "./types";
+import { CausalConfidence, CausalEdge, CausalEdgeType, Episode, EventStatus, ProjectRecord, ProjectTimeline, TaskJourney, TaskJourneyStage, TimelineEvent, TimelineLane } from "./types";
 import { stableId } from "./id";
 
 const EPISODE_GAP_MINUTES = 90;
@@ -10,8 +10,72 @@ export function buildProjectTimeline(project: ProjectRecord, events: TimelineEve
     project,
     events: sortedEvents,
     episodes: groupEpisodes(project.id, sortedEvents),
-    causalEdges: buildCausalEdges(project.id, sortedEvents)
+    causalEdges: buildCausalEdges(project.id, sortedEvents),
+    taskJourneys: buildTaskJourneys(project.id, sortedEvents)
   };
+}
+
+export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): TaskJourney[] {
+  const projectEvents = events
+    .filter((event) => event.projectId === projectId)
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const promptIndexes = projectEvents
+    .map((event, index) => ({ event, index }))
+    .filter(({ event }) => event.kind === "user_prompt");
+
+  return promptIndexes.map(({ event: prompt, index }, promptIndex) => {
+    const nextPrompt = promptIndexes[promptIndex + 1]?.event;
+    const endIndex = nextPrompt ? projectEvents.findIndex((event) => event.id === nextPrompt.id) : projectEvents.length;
+    const journeyEvents = projectEvents.slice(index, endIndex);
+    const end = journeyEvents.at(-1) ?? prompt;
+    const stages = buildTaskJourneyStages(journeyEvents);
+    const failures = journeyEvents.filter((event) => event.status === "failed").length;
+    const successes = journeyEvents.filter((event) => event.lane === "Verification" && event.status === "success").length;
+    const status: EventStatus = failures > 0 ? "failed" : successes > 0 ? "success" : "unknown";
+    const stageCounts = stages.reduce<Partial<Record<TimelineLane, number>>>((counts, stage) => {
+      counts[stage.lane] = stage.count;
+      return counts;
+    }, {});
+
+    return {
+      id: stableId("task_journey", projectId, prompt.id, end.id),
+      projectId,
+      sessionId: prompt.sessionId,
+      promptEventId: prompt.id,
+      startedAt: prompt.timestamp,
+      endedAt: end.timestamp,
+      title: prompt.title,
+      summary: `From user input through ${journeyEvents.length} event(s), ${stages.length} stage(s), ending at ${nextPrompt ? "next user input" : "session end"}.`,
+      status,
+      exitType: nextPrompt ? "next_prompt" : "session_end",
+      eventIds: journeyEvents.map((event) => event.id),
+      stageCounts,
+      stages
+    };
+  });
+}
+
+function buildTaskJourneyStages(events: TimelineEvent[]): TaskJourneyStage[] {
+  const laneOrder: TimelineLane[] = ["Product", "Architecture", "Code", "Agent Runs", "Verification", "Risks"];
+  return laneOrder.flatMap((lane) => {
+    const laneEvents = events.filter((event) => event.lane === lane);
+    if (laneEvents.length === 0) return [];
+    const failures = laneEvents.filter((event) => event.status === "failed").length;
+    const successes = laneEvents.filter((event) => event.status === "success").length;
+    const status: EventStatus = failures > 0 ? "failed" : successes > 0 ? "success" : "unknown";
+    const first = laneEvents[0];
+    const last = laneEvents.at(-1) ?? first;
+    return [
+      {
+        lane,
+        count: laneEvents.length,
+        status,
+        firstEventId: first.id,
+        lastEventId: last.id,
+        eventIds: laneEvents.map((event) => event.id)
+      }
+    ];
+  });
 }
 
 export function buildCausalEdges(projectId: string, events: TimelineEvent[]): CausalEdge[] {

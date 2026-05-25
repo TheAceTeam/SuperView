@@ -50,6 +50,39 @@ describe("Codex parser and normalizer", () => {
     expect(nodes.some((node) => node.type === "hazard")).toBe(true);
   });
 
+  it("builds task journeys from each user prompt boundary", () => {
+    const lines = parseCodexJsonlContent(fixture("call-association-rollout.jsonl"), "call-association-rollout.jsonl");
+    const bundle = normalizeCodexLines(lines, { repoRoot: "/tmp/superview-fixture" });
+    expect(bundle).toBeTruthy();
+
+    const timeline = buildProjectTimeline(bundle!.project, bundle!.events);
+    const prompt = timeline.events.find((event) => event.kind === "user_prompt");
+    const retryMessage = timeline.events.find((event) => event.title.includes("Retrying"));
+    const journey = timeline.taskJourneys[0];
+
+    expect(timeline.taskJourneys).toHaveLength(1);
+    expect(journey).toMatchObject({
+      projectId: bundle!.project.id,
+      sessionId: "fixture-call-association-session",
+      promptEventId: prompt?.id,
+      title: "Update architecture docs and retry failing tests",
+      startedAt: prompt?.timestamp,
+      endedAt: retryMessage?.timestamp,
+      status: "failed",
+      exitType: "session_end"
+    });
+    expect(journey.eventIds[0]).toBe(prompt?.id);
+    expect(journey.eventIds).toContain(retryMessage?.id);
+    expect(journey.stageCounts).toMatchObject({
+      Product: 1,
+      Architecture: 2,
+      Verification: 1,
+      Risks: 1,
+      "Agent Runs": 1
+    });
+    expect(journey.stages.map((stage) => stage.lane)).toEqual(["Product", "Architecture", "Agent Runs", "Verification", "Risks"]);
+  });
+
   it("builds causal edges between prompts, patches, failed tests, and retries", () => {
     const lines = parseCodexJsonlContent(fixture("call-association-rollout.jsonl"), "call-association-rollout.jsonl");
     const bundle = normalizeCodexLines(lines, { repoRoot: "/tmp/superview-fixture" });
