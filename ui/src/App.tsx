@@ -1,14 +1,11 @@
-import { AlertTriangle, ChevronRight, Database, FileText, GitBranch, Moon, Pause, Play, RotateCw, Search, Sun, TerminalSquare } from "lucide-react";
+import { AlertTriangle, FileText, GitBranch, Moon, RotateCw, Search, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, ReplayNode, RunReplay, TaskJourney, TaskJourneyDetail, TaskJourneyStage, TimelineEvent } from "../../core/types";
-import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchRun, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
+import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, TaskJourney, TaskJourneyDetail, TimelineEvent } from "../../core/types";
+import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
 
-const SEMANTIC_LANES = ["Product", "Architecture", "Code", "Verification", "Risks"];
 const TIMELINE_LIMIT = 300;
-const LANE_RENDER_LIMIT = 28;
-const TRACE_RENDER_LIMIT = 36;
 const PRELOAD_JOURNEY_DETAILS = 3;
 
 export function App() {
@@ -22,16 +19,13 @@ export function App() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [journeyDetails, setJourneyDetails] = useState<Record<string, TaskJourneyDetail>>({});
   const [journeyLoadingIds, setJourneyLoadingIds] = useState<Record<string, boolean>>({});
+  const [expandedJourneyIds, setExpandedJourneyIds] = useState<Record<string, boolean>>({});
   const [eventEvidence, setEventEvidence] = useState<EventEvidence | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
-  const [selectedRun, setSelectedRun] = useState<RunReplay | null>(null);
-  const [selectedNode, setSelectedNode] = useState<ReplayNode | null>(null);
   const [job, setJob] = useState<IngestJob | null>(null);
   const [codexHome, setCodexHome] = useState("");
   const [showCausalPaths, setShowCausalPaths] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [playing, setPlaying] = useState(false);
-  const [playIndex, setPlayIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,19 +92,6 @@ export function App() {
     return () => window.clearInterval(timer);
   }, [job]);
 
-  useEffect(() => {
-    if (!playing || !selectedRun || selectedRun.nodes.length === 0) return;
-    const timer = window.setInterval(() => {
-      setPlayIndex((current) => {
-        const next = Math.min(current + 1, selectedRun.nodes.length - 1);
-        setSelectedNode(selectedRun.nodes[next] ?? null);
-        if (next === selectedRun.nodes.length - 1) setPlaying(false);
-        return next;
-      });
-    }, 620);
-    return () => window.clearInterval(timer);
-  }, [playing, selectedRun]);
-
   async function loadProjects() {
     setLoading(true);
     try {
@@ -133,9 +114,7 @@ export function App() {
       setTimelineOffset(next.offset ?? offset);
       setSelectedEvent(next.events[0] ?? null);
       setSelectedJourneyId(next.taskJourneys[0]?.id ?? null);
-      setSelectedRun(null);
-      setSelectedNode(null);
-      setPlaying(false);
+      setExpandedJourneyIds({});
       setError(null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError));
@@ -162,14 +141,6 @@ export function App() {
     setJob(await fetchIngestJob(jobId));
   }
 
-  async function openRun(sessionId: string) {
-    const replay = await fetchRun(sessionId);
-    setSelectedRun(replay);
-    setPlayIndex(0);
-    setSelectedNode(replay.nodes[0] ?? null);
-    setSelectedEvent(replay.events[0] ?? null);
-  }
-
   async function loadJourneyDetail(journeyId: string) {
     if (journeyDetails[journeyId] || journeyLoadingIds[journeyId]) return;
     setJourneyLoadingIds((current) => ({ ...current, [journeyId]: true }));
@@ -190,9 +161,16 @@ export function App() {
     const summary = timeline?.taskJourneys.find((journey) => journey.id === journeyId);
     const promptEvent = summary ? eventsById.get(summary.promptEventId) : null;
     if (promptEvent) {
-      setSelectedNode(null);
       setSelectedEvent(promptEvent);
     }
+  }
+
+  function toggleJourneyDetails(journeyId: string) {
+    setExpandedJourneyIds((current) => {
+      const nextExpanded = !current[journeyId];
+      if (nextExpanded) void loadJourneyDetail(journeyId);
+      return { ...current, [journeyId]: nextExpanded };
+    });
   }
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
@@ -202,10 +180,11 @@ export function App() {
   const detailEvents = selectedJourneyDetail?.events ?? [];
   const eventsById = useMemo(() => mergeEventMaps(timelineEventsById, detailEvents), [timelineEventsById, detailEvents]);
 
-  const drawerEvent = selectedNode ? selectedRun?.events.find((event) => event.id === selectedNode.eventId) ?? selectedEvent : selectedEvent;
+  const selectedJourneyExpanded = selectedJourney ? Boolean(expandedJourneyIds[selectedJourney.id]) : false;
+  const drawerEvent = selectedEvent;
   const drawerEvidence = eventEvidence?.event.id === drawerEvent?.id ? eventEvidence : null;
-  const drawerArtifacts = drawerEvidence?.artifacts ?? selectedRun?.artifacts.filter((artifact) => artifact.eventId === drawerEvent?.id) ?? [];
-  const drawerEvents = useMemo(() => mergeEvents(timeline?.events ?? [], selectedRun?.events ?? [], detailEvents), [timeline, selectedRun, detailEvents]);
+  const drawerArtifacts = drawerEvidence?.artifacts ?? [];
+  const drawerEvents = useMemo(() => mergeEvents(timeline?.events ?? [], detailEvents), [timeline, detailEvents]);
   const causalEdges = selectedJourneyDetail?.causalEdges ?? timeline?.causalEdges ?? [];
   const causalView = useMemo(() => buildCausalView(drawerEvents, causalEdges, drawerEvent?.id ?? null), [drawerEvents, causalEdges, drawerEvent?.id]);
   const totalEvents = timeline?.totalEvents ?? timeline?.events.length ?? 0;
@@ -246,7 +225,7 @@ export function App() {
           <div>
             <p className="eyebrow">Project Timeline</p>
             <h1>{selectedProject?.name ?? "No project indexed yet"}</h1>
-            <p className="lead">From each user input to exit: intent, design, code, verification, risk, and agent trace.</p>
+            <p className="lead">Replay each user input as the Codex CLI conversation, with background work available on demand.</p>
           </div>
           <div className="status-cluster">
             <Metric label="Projects" value={projects.length} />
@@ -263,32 +242,16 @@ export function App() {
         ) : projects.length === 0 ? (
           <EmptyState title="No Codex runs indexed" detail="Scan local rollout JSONL files from ~/.codex/sessions to build the first timeline." codexHome={codexHome} onCodexHomeChange={setCodexHome} onScan={handleScan} />
         ) : (
-          <div className="dashboard-grid journey-dashboard-grid">
-            <aside className="run-ledger">
-              <div className="panel-heading">
-                <Database size={17} />
-                <span>Run Ledger</span>
+          <div className="dashboard-grid conversation-dashboard-grid">
+            <aside className="input-navigator project-input-sidebar">
+              <div className="project-selector-panel">
+                <label className="field-label" htmlFor="project-select">Project</label>
+                <select id="project-select" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)}>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name}</option>
+                  ))}
+                </select>
               </div>
-              <label className="field-label" htmlFor="project-select">Project</label>
-              <select id="project-select" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)}>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
-                ))}
-              </select>
-              <div className="run-list">
-                {(selectedProject?.sessions ?? []).map((session) => (
-                  <button key={session.id} className={`run-row ${selectedRun?.session.id === session.id ? "active" : ""}`} onClick={() => void openRun(session.id)}>
-                    <span>
-                      <strong>{session.id.slice(0, 8)}</strong>
-                      <small>{formatDate(session.startedAt)}</small>
-                    </span>
-                    <ChevronRight size={16} />
-                  </button>
-                ))}
-              </div>
-            </aside>
-
-            <aside className="input-navigator">
               <div className="panel-heading">
                 <Search size={17} />
                 <span>User Inputs</span>
@@ -307,7 +270,7 @@ export function App() {
             <section className="timeline-panel">
               <div className="panel-heading">
                 <FileText size={17} />
-                <span>Task Journeys</span>
+                <span>CLI Conversation</span>
                 <em>{timelineOffset + 1}-{pageEnd} of {totalEvents}</em>
               </div>
               <div className="timeline-controls">
@@ -322,38 +285,19 @@ export function App() {
                 </div>
               </div>
               {showCausalPaths ? <CausalRibbon view={causalView} /> : null}
-              <TaskJourneyList
-                journeys={selectedJourney ? [selectedJourneyDetail?.journey ?? selectedJourney] : []}
-                eventsById={eventsById}
+              <ConversationThread
+                journey={selectedJourneyDetail?.journey ?? selectedJourney}
+                detail={selectedJourneyDetail}
+                expanded={selectedJourneyExpanded}
+                loading={selectedJourney ? Boolean(journeyLoadingIds[selectedJourney.id]) : false}
                 selectedEventId={drawerEvent?.id ?? null}
                 causalView={causalView}
                 showCausalPaths={showCausalPaths}
-                loadingJourneyIds={journeyLoadingIds}
+                onToggleDetails={() => selectedJourney ? toggleJourneyDetails(selectedJourney.id) : undefined}
                 onSelectEvent={(event) => {
-                  setSelectedNode(null);
                   setSelectedEvent(event);
                 }}
               />
-
-              {selectedRun ? (
-                <RunReplayPanel
-                  run={selectedRun}
-                  playing={playing}
-                  playIndex={playIndex}
-                  selectedNode={selectedNode}
-                  onPlay={() => setPlaying(true)}
-                  onPause={() => setPlaying(false)}
-                  onScrub={(index) => {
-                    setPlayIndex(index);
-                    setSelectedNode(selectedRun.nodes[index] ?? null);
-                  }}
-                  onSelectNode={(node, index) => {
-                    setSelectedNode(node);
-                    setPlayIndex(index);
-                    setSelectedEvent(selectedRun.events.find((event) => event.id === node.eventId) ?? null);
-                  }}
-                />
-              ) : null}
             </section>
 
             <EvidenceDrawer event={drawerEvent ?? null} artifacts={drawerArtifacts} rawEvent={drawerEvidence?.rawEvent ?? null} loading={evidenceLoading} causalEdges={causalView.directEdges} events={drawerEvents} />
@@ -429,8 +373,8 @@ function mergeEventMaps(primary: Map<string, TimelineEvent>, secondary: Timeline
   return eventsById;
 }
 
-function eventDotClass(event: TimelineEvent, selectedId: string | null, causalView: CausalView, showCausalPaths: boolean) {
-  const classes = ["event-dot", event.status];
+function eventItemClass(event: TimelineEvent, selectedId: string | null, causalView: CausalView, showCausalPaths: boolean) {
+  const classes = ["log-entry", event.status];
   if (event.id === selectedId) classes.push("selected");
   if (showCausalPaths && selectedId) {
     if (causalView.upstream.has(event.id)) classes.push("causal-upstream");
@@ -455,7 +399,7 @@ function CausalRibbon({ view }: { view: CausalView }) {
         <div className="causal-chain">
           {view.chainEvents.map((event, index) => (
             <span className="causal-chain-item" data-role={event.id === view.selectedId ? "selected" : view.upstream.has(event.id) ? "upstream" : "downstream"} key={event.id}>
-              <b>{event.lane}</b>
+              <b>{formatEventKind(event.kind)}</b>
               <em>{shortLabel(event.title)}</em>
               {index < view.chainEvents.length - 1 ? <i aria-hidden="true">&gt;</i> : null}
             </span>
@@ -468,141 +412,110 @@ function CausalRibbon({ view }: { view: CausalView }) {
   );
 }
 
-function TaskJourneyList({
-  journeys,
-  eventsById,
+function ConversationThread({
+  journey,
+  detail,
+  expanded,
+  loading,
   selectedEventId,
   causalView,
   showCausalPaths,
-  loadingJourneyIds,
+  onToggleDetails,
   onSelectEvent
 }: {
-  journeys: TaskJourney[];
-  eventsById: Map<string, TimelineEvent>;
+  journey: TaskJourney | null;
+  detail: TaskJourneyDetail | null;
+  expanded: boolean;
+  loading: boolean;
   selectedEventId: string | null;
   causalView: CausalView;
   showCausalPaths: boolean;
-  loadingJourneyIds: Record<string, boolean>;
+  onToggleDetails: () => void;
   onSelectEvent: (event: TimelineEvent) => void;
 }) {
-  if (journeys.length === 0) {
+  if (!journey) {
     return <p className="muted">No user-input task journeys are visible on this page.</p>;
   }
 
-  return (
-    <div className="task-journeys">
-      {journeys.map((journey, index) => {
-        const prompt = eventsById.get(journey.promptEventId);
-        const traceStage = journey.stages.find((stage) => stage.lane === "Agent Runs");
-        const traceEvents = (traceStage?.eventIds ?? []).map((eventId) => eventsById.get(eventId)).filter((event): event is TimelineEvent => Boolean(event));
-        return (
-          <article className={`task-journey ${journey.status}`} key={journey.id}>
-            <button className="task-journey-header" onClick={() => prompt ? onSelectEvent(prompt) : undefined}>
-              <span className="task-index">#{index + 1}</span>
-              <span>
-                <small>Input to exit</small>
-                <strong>{journey.title}</strong>
-              </span>
-              <em>{formatExitType(journey.exitType)}</em>
-            </button>
-            <div className="journey-meta">
-              <span>{journey.eventIds.length} events</span>
-              <span>{journey.stages.length} stages</span>
-              <span>{formatDate(journey.startedAt)} - {formatDate(journey.endedAt)}</span>
-              {loadingJourneyIds[journey.id] ? <span>Loading details</span> : null}
-            </div>
-            <p className="journey-summary">{journey.summary}</p>
-            <div className="journey-stages">
-              {SEMANTIC_LANES.map((lane) => {
-                const stage = journey.stages.find((candidate) => candidate.lane === lane);
-                return <JourneyStage key={lane} lane={lane} stage={stage} eventsById={eventsById} selectedEventId={selectedEventId} causalView={causalView} showCausalPaths={showCausalPaths} onSelectEvent={onSelectEvent} />;
-              })}
-            </div>
-            <AgentTraceRail events={traceEvents} selectedEventId={selectedEventId} causalView={causalView} showCausalPaths={showCausalPaths} onSelectEvent={onSelectEvent} />
-          </article>
-        );
-      })}
-    </div>
-  );
-}
+  const events = detail?.events ?? [];
+  const prompt = events.find((event) => event.id === journey.promptEventId || event.kind === "user_prompt");
+  const assistantMessage = events.find((event) => event.kind === "assistant_message");
+  const backgroundEvents = events.filter((event) => event.kind !== "user_prompt" && event.id !== assistantMessage?.id);
+  const logEvents = events.filter((event) => event.kind === "tool_call" || event.kind === "tool_result" || event.kind === "file_change" || event.kind === "verification" || event.kind === "error");
+  const codexOutput = assistantMessage?.detail ?? assistantMessage?.title ?? journey.summary;
+  const promptText = prompt?.detail ?? journey.title;
 
-function JourneyStage({
-  lane,
-  stage,
-  eventsById,
-  selectedEventId,
-  causalView,
-  showCausalPaths,
-  onSelectEvent
-}: {
-  lane: string;
-  stage: TaskJourneyStage | undefined;
-  eventsById: Map<string, TimelineEvent>;
-  selectedEventId: string | null;
-  causalView: CausalView;
-  showCausalPaths: boolean;
-  onSelectEvent: (event: TimelineEvent) => void;
-}) {
-  const events = (stage?.eventIds ?? []).map((eventId) => eventsById.get(eventId)).filter((event): event is TimelineEvent => Boolean(event));
   return (
-    <div className={`journey-stage ${stage?.status ?? "unknown"}`}>
-      <div className="lane-label">
-        <span>{lane}</span>
-        <small>{stage?.count ?? 0}</small>
+    <article className={`conversation-thread ${journey.status}`}>
+      <div className="conversation-summary">
+        <strong>{journey.title}</strong>
+        <div>
+          <span>{journey.eventIds.length} events</span>
+          <span>{formatExitType(journey.exitType)}</span>
+          <span>{formatDate(journey.startedAt)} - {formatDate(journey.endedAt)}</span>
+          {loading ? <span>Loading details</span> : null}
+        </div>
       </div>
-      <div className="lane-track">
-        {events.slice(0, LANE_RENDER_LIMIT).map((event) => (
-          <button
-            key={event.id}
-            className={eventDotClass(event, selectedEventId, causalView, showCausalPaths)}
-            title={event.title}
-            data-event-id={event.id}
-            onClick={() => onSelectEvent(event)}
-          >
-            <span>{shortLabel(event.title)}</span>
-          </button>
-        ))}
-        {events.length > LANE_RENDER_LIMIT ? <span className="lane-overflow">+{events.length - LANE_RENDER_LIMIT} more in stage</span> : null}
-      </div>
-    </div>
-  );
-}
 
-function AgentTraceRail({
-  events,
-  selectedEventId,
-  causalView,
-  showCausalPaths,
-  onSelectEvent
-}: {
-  events: TimelineEvent[];
-  selectedEventId: string | null;
-  causalView: CausalView;
-  showCausalPaths: boolean;
-  onSelectEvent: (event: TimelineEvent) => void;
-}) {
-  return (
-    <section className="agent-trace-rail" aria-label="Agent Trace">
-      <div className="agent-trace-heading">
-        <TerminalSquare size={15} />
-        <span>Agent Trace</span>
-        <small>{events.length} execution events</small>
+      <div className="message-thread">
+        <button className={`conversation-message user ${prompt?.id === selectedEventId ? "selected" : ""}`} onClick={() => prompt ? onSelectEvent(prompt) : undefined}>
+          <span className="message-meta">User</span>
+          <strong>{journey.title}</strong>
+          <p>{promptText}</p>
+        </button>
+
+        <button className={`conversation-message codex ${assistantMessage?.id === selectedEventId ? "selected" : ""}`} onClick={() => assistantMessage ? onSelectEvent(assistantMessage) : undefined}>
+          <span className="message-meta">Codex CLI</span>
+          <p>{codexOutput}</p>
+        </button>
       </div>
-      <div className="trace-track">
-        {events.slice(0, TRACE_RENDER_LIMIT).map((event) => (
-          <button
-            key={event.id}
-            className={eventDotClass(event, selectedEventId, causalView, showCausalPaths).replace("event-dot", "trace-dot")}
-            title={event.title}
-            data-event-id={event.id}
-            onClick={() => onSelectEvent(event)}
-          >
-            <span>{shortLabel(event.title)}</span>
-          </button>
-        ))}
-        {events.length > TRACE_RENDER_LIMIT ? <span className="lane-overflow">+{events.length - TRACE_RENDER_LIMIT} more trace events</span> : null}
-      </div>
-    </section>
+
+      <button className="detail-toggle" onClick={onToggleDetails}>{expanded ? "隐藏细节" : "查看细节"}</button>
+
+      {expanded ? (
+        <div className="background-details">
+          <section>
+            <div className="detail-section-heading">
+              <span>Background Work</span>
+              <em>{backgroundEvents.length} events</em>
+            </div>
+            <div className="log-list">
+              {backgroundEvents.length > 0 ? (
+                backgroundEvents.map((event) => (
+                  <button key={event.id} className={eventItemClass(event, selectedEventId, causalView, showCausalPaths)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
+                    <span>{event.kind}</span>
+                    <strong>{event.title}</strong>
+                    <small>{event.detail ?? formatDate(event.timestamp)}</small>
+                  </button>
+                ))
+              ) : (
+                <p className="muted">No background work captured for this task.</p>
+              )}
+            </div>
+          </section>
+
+          <section>
+            <div className="detail-section-heading">
+              <span>Log</span>
+              <em>{logEvents.length} entries</em>
+            </div>
+            <div className="log-list compact">
+              {logEvents.length > 0 ? (
+                logEvents.map((event) => (
+                  <button key={event.id} className={eventItemClass(event, selectedEventId, causalView, showCausalPaths)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
+                    <span>{event.toolName ?? event.kind}</span>
+                    <strong>{event.title}</strong>
+                    <small>{event.detail ?? event.callId ?? formatDate(event.timestamp)}</small>
+                  </button>
+                ))
+              ) : (
+                <p className="muted">No tool or verification log entries captured.</p>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -658,55 +571,6 @@ function JobStrip({ job }: { job: IngestJob }) {
   );
 }
 
-function RunReplayPanel({
-  run,
-  playing,
-  playIndex,
-  selectedNode,
-  onPlay,
-  onPause,
-  onScrub,
-  onSelectNode
-}: {
-  run: RunReplay;
-  playing: boolean;
-  playIndex: number;
-  selectedNode: ReplayNode | null;
-  onPlay: () => void;
-  onPause: () => void;
-  onScrub: (index: number) => void;
-  onSelectNode: (node: ReplayNode, index: number) => void;
-}) {
-  return (
-    <div className="replay-panel">
-      <div className="panel-heading">
-        <TerminalSquare size={17} />
-        <span>Selected Run Replay</span>
-        <em>{run.nodes.length} nodes</em>
-      </div>
-      <div className="replay-controls">
-        <button className="control-button" onClick={playing ? onPause : onPlay}>{playing ? <Pause size={15} /> : <Play size={15} />}{playing ? "Pause" : "Play run"}</button>
-        <input aria-label="Replay scrubber" type="range" min={0} max={Math.max(run.nodes.length - 1, 0)} value={playIndex} onChange={(event) => onScrub(Number(event.target.value))} />
-        <span>{playIndex + 1}/{Math.max(run.nodes.length, 1)}</span>
-      </div>
-      <div className="level-map">
-        <div className="ground" />
-        {run.nodes.map((node, index) => (
-          <button
-            key={node.id}
-            className={`level-node ${node.type} ${selectedNode?.id === node.id ? "selected" : ""}`}
-            style={{ left: node.x }}
-            onClick={() => onSelectNode(node, index)}
-          >
-            <span>{node.label}</span>
-          </button>
-        ))}
-        {selectedNode ? <div className="agent" style={{ left: selectedNode.x + 12 }} title="Agent marker" /> : null}
-      </div>
-    </div>
-  );
-}
-
 function EvidenceDrawer({
   event,
   artifacts,
@@ -732,7 +596,7 @@ function EvidenceDrawer({
       </div>
       {event ? (
         <>
-          <div className={`status-badge ${event.status}`}>{event.lane}</div>
+          <div className={`status-badge ${event.status}`}>{formatEventKind(event.kind)}</div>
           <h2>{event.title}</h2>
           <dl>
             <dt>Kind</dt>
@@ -793,6 +657,10 @@ function EvidenceDrawer({
 
 function formatCausalType(type: CausalEdge["type"]) {
   return type.replace(/_/g, " ");
+}
+
+function formatEventKind(kind: TimelineEvent["kind"]) {
+  return kind.replace(/_/g, " ");
 }
 
 function formatDate(value: string) {

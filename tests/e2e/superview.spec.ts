@@ -1,9 +1,60 @@
 import { expect, test } from "@playwright/test";
 
-test("scans fixture logs, renders timeline, opens replay, and toggles theme", async ({ page }) => {
+test("scans fixture logs, renders CLI conversation thread, hides background detail, and toggles theme", async ({ page }) => {
   let timelineRequestCount = 0;
   let evidenceRequested = false;
   const journeyDetailRequests: string[] = [];
+
+  await page.route("**/api/projects", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        projects: [
+          {
+            id: "project-fixture",
+            name: "superview-fixture",
+            cwd: "/tmp/superview-fixture",
+            repoRoot: "/tmp/superview-fixture",
+            createdAt: "2026-05-25T02:00:00.000Z",
+            updatedAt: "2026-05-25T02:00:00.000Z",
+            sessions: [
+              {
+                id: "fixture-tool-session",
+                projectId: "project-fixture",
+                path: "/tmp/superview-fixture/rollout.jsonl",
+                cwd: "/tmp/superview-fixture",
+                startedAt: "2026-05-25T02:00:00.000Z",
+                endedAt: "2026-05-25T02:05:00.000Z",
+                cliVersion: "fixture",
+                modelProvider: "openai",
+                source: "fixture"
+              }
+            ]
+          }
+        ]
+      })
+    });
+  });
+
+  await page.route("**/api/ingest", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ jobId: "job-fixture" }) });
+  });
+
+  await page.route("**/api/ingest/jobs/job-fixture", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "job-fixture",
+        status: "completed",
+        startedAt: "2026-05-25T02:00:00.000Z",
+        finishedAt: "2026-05-25T02:00:01.000Z",
+        totalFiles: 1,
+        processedFiles: 1,
+        totalEvents: 340,
+        errors: []
+      })
+    });
+  });
 
   await page.route("**/api/projects/*/timeline?**", async (route) => {
     timelineRequestCount += 1;
@@ -19,7 +70,7 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
       sessionId: "fixture-tool-session",
       turnId: "turn-1",
       timestamp: new Date(baseTime + offset * 1000 + index * 1000).toISOString(),
-      kind: index % 3 === 0 ? "tool_call" : "agent_message",
+      kind: index % 3 === 0 ? "tool_call" : "assistant_message",
       lane: index % 2 === 0 ? "Code" : "Agent Runs",
       title: `Timeline event ${offset + index}`,
       detail: `Redacted event detail ${offset + index}`,
@@ -212,10 +263,10 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
       sessionId: "fixture-tool-session",
       turnId: "turn-1",
       timestamp: new Date(baseTime + offset * 1000 + index * 1000).toISOString(),
-      kind: index === 0 ? "user_prompt" : index % 3 === 0 ? "tool_call" : "agent_message",
+      kind: index === 0 ? "user_prompt" : index % 3 === 0 ? "tool_call" : "assistant_message",
       lane: index === 0 ? "Product" : index % 2 === 0 ? "Code" : "Agent Runs",
-      title: index === 0 ? `User task ${offset}` : `Loaded detail event ${offset + index}`,
-      detail: `Loaded task detail ${offset + index}`,
+      title: index === 0 ? `User task ${offset}` : index === 1 ? `Codex CLI output ${offset}` : `Loaded detail event ${offset + index}`,
+      detail: index === 1 ? `Codex completed task ${offset} in CLI output.` : `Loaded task detail ${offset + index}`,
       toolName: index % 3 === 0 && index !== 0 ? "exec_command" : null,
       callId: index % 3 === 0 && index !== 0 ? `call-${offset + index}` : null,
       status: "success",
@@ -288,15 +339,19 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
   await page.getByRole("button", { name: "Scan Codex Logs" }).first().click();
 
   await expect(page.getByText(/Ingest completed/)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText("Task Journeys", { exact: true })).toBeVisible();
+  await expect(page.getByText("CLI Conversation", { exact: true })).toBeVisible();
   await expect(page.getByText("User Inputs", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /#1 Input to exit User task 0/ })).toBeVisible();
+  await expect(page.getByText("Run Ledger", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".run-row")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /User task 0.*75 events/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /User task 225.*75 events/ })).toBeVisible();
-  await expect(page.getByText("Input to exit", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /#1 Input to exit User task 0.*Session end/ })).toBeVisible();
-  await expect(page.getByText("Agent Trace", { exact: true })).toBeVisible();
-  await expect(page.locator(".lane-label").filter({ hasText: "Agent Runs" })).toHaveCount(0);
+  await expect(page.getByText("User", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Codex CLI", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Build task journey from input 0")).toBeVisible();
+  await expect(page.getByText("Loaded task detail 2")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "查看细节" })).toBeVisible();
+  await expect(page.getByText("Agent Trace", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".lane-label")).toHaveCount(0);
   await expect(page.getByText("1-300 of 340")).toBeVisible();
   await expect(page.getByText("4 task journeys loaded from 300 events")).toBeVisible();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-0").length).toBe(1);
@@ -309,24 +364,22 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
   await expect(page.getByText("301-340 of 340")).toBeVisible();
   await page.getByRole("button", { name: /User task 300.*40 events/ }).click();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-300").length).toBe(1);
-  await expect(page.getByText("Loaded dynamic detail for task 300.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /#1 Input to exit User task 300/ })).toBeVisible();
-  await expect(page.getByText("Run Ledger")).toBeVisible();
+  await expect(page.getByText("Codex completed task 300 in CLI output.")).toBeVisible();
+  await expect(page.getByText("Loaded task detail 302")).toHaveCount(0);
+  await page.getByRole("button", { name: "查看细节" }).click();
+  await expect(page.getByText("Background Work", { exact: true })).toBeVisible();
+  await expect(page.getByText("Log", { exact: true })).toBeVisible();
+  await expect(page.getByText("Loaded task detail 302")).toBeVisible();
+  await expect(page.getByRole("button", { name: "隐藏细节" })).toBeVisible();
   await page.getByRole("button", { name: "Show causal paths" }).click();
   await expect(page.getByLabel("Causal path")).toBeVisible();
-  await page.getByRole("button", { name: /#1 Input to exit User task 300/ }).click({ force: true });
+  await page.getByRole("button", { name: /Codex CLI.*Codex completed task 300/ }).click({ force: true });
   await expect(page.getByText("1 causal links on this page")).toBeVisible();
-  await expect(page.locator('[data-event-id="event-301"]')).toHaveClass(/causal-downstream/);
   await expect(page.getByRole("heading", { name: "Causal Links" })).toBeVisible();
   await expect(page.getByText("verified by")).toBeVisible();
   await expect(page.getByText("redacted command output")).toBeVisible();
   await expect(page.getByText("{\"token\":\"[REDACTED]\"}")).toBeVisible();
   expect(evidenceRequested).toBe(true);
-
-  await page.locator(".run-row").first().click();
-  await expect(page.getByText("Selected Run Replay")).toBeVisible();
-  await page.getByRole("button", { name: /Play run/ }).click();
-  await expect(page.locator(".agent")).toBeVisible();
 
   await page.getByLabel("Toggle theme").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
