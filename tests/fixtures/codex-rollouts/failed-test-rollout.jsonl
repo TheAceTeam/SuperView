@@ -1,0 +1,5 @@
+{"timestamp":"2026-05-25T03:00:00.000Z","type":"session_meta","payload":{"id":"fixture-failed-session","timestamp":"2026-05-25T03:00:00.000Z","cwd":"/tmp/superview-fixture","cli_version":"0.125.0","model_provider":"OpenAI","source":"cli"}}
+{"timestamp":"2026-05-25T03:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Run verification"}]}}
+{"timestamp":"2026-05-25T03:00:02.000Z","type":"response_item","payload":{"type":"function_call","name":"functions.exec_command","call_id":"call-test","arguments":"{\"cmd\":\"pnpm test\"}"}}
+{"timestamp":"2026-05-25T03:00:03.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-test","output":"Tests failed with exit code 1\nFAIL tests/parser.test.ts"}}
+{"timestamp":"2026-05-25T03:00:04.000Z","type":"event_msg","payload":{"type":"error","message":"Command failed"}}

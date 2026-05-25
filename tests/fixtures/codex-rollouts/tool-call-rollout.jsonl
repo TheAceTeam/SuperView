@@ -1,0 +1,7 @@
+{"timestamp":"2026-05-25T02:00:00.000Z","type":"session_meta","payload":{"id":"fixture-tool-session","timestamp":"2026-05-25T02:00:00.000Z","cwd":"/tmp/superview-fixture","cli_version":"0.125.0","model_provider":"OpenAI","source":"cli"}}
+{"timestamp":"2026-05-25T02:00:01.000Z","type":"turn_context","payload":{"turn_id":"turn-1","cwd":"/tmp/superview-fixture","model":"gpt-5"}}
+{"timestamp":"2026-05-25T02:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Add parser tests"}]}}
+{"timestamp":"2026-05-25T02:00:03.000Z","type":"response_item","payload":{"type":"function_call","name":"functions.exec_command","call_id":"call-1","arguments":"{\"cmd\":\"rg --files core tests\"}"}}
+{"timestamp":"2026-05-25T02:00:04.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"core/parser.ts\ntests/parser.test.ts"}}
+{"timestamp":"2026-05-25T02:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"functions.apply_patch","call_id":"call-2","arguments":"*** Begin Patch\n*** Add File: core/parser.ts\n+export const ok = true;\n*** End Patch"}}
+{"timestamp":"2026-05-25T02:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-2","output":"Success. Updated files:\nA core/parser.ts"}}
