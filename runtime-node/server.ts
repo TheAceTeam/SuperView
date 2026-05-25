@@ -69,6 +69,15 @@ export function createServer() {
     });
   });
 
+  app.get("/api/task-journeys/:id", (req, res) => {
+    const detail = db.getTaskJourneyDetail(req.params.id);
+    if (!detail) {
+      res.status(404).json({ error: "task journey not found" });
+      return;
+    }
+    res.json(detail);
+  });
+
   app.get("/api/runs/:id", (req, res) => {
     const replay = db.getRunReplay(req.params.id);
     if (!replay) {

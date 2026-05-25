@@ -1,7 +1,7 @@
 import { AlertTriangle, ChevronRight, Database, FileText, GitBranch, Moon, Pause, Play, RotateCw, Search, Sun, TerminalSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, ReplayNode, RunReplay, TaskJourney, TaskJourneyStage, TimelineEvent } from "../../core/types";
-import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchRun, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
+import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, ReplayNode, RunReplay, TaskJourney, TaskJourneyDetail, TaskJourneyStage, TimelineEvent } from "../../core/types";
+import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchRun, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
 
@@ -9,6 +9,7 @@ const SEMANTIC_LANES = ["Product", "Architecture", "Code", "Verification", "Risk
 const TIMELINE_LIMIT = 300;
 const LANE_RENDER_LIMIT = 28;
 const TRACE_RENDER_LIMIT = 36;
+const PRELOAD_JOURNEY_DETAILS = 3;
 
 export function App() {
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("superview-theme") as Theme | null) ?? "light");
@@ -18,6 +19,9 @@ export function App() {
   const [timelineOffset, setTimelineOffset] = useState(0);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
+  const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
+  const [journeyDetails, setJourneyDetails] = useState<Record<string, TaskJourneyDetail>>({});
+  const [journeyLoadingIds, setJourneyLoadingIds] = useState<Record<string, boolean>>({});
   const [eventEvidence, setEventEvidence] = useState<EventEvidence | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [selectedRun, setSelectedRun] = useState<RunReplay | null>(null);
@@ -43,6 +47,14 @@ export function App() {
     if (!selectedProjectId) return;
     void loadTimeline(selectedProjectId, 0);
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!timeline || timeline.taskJourneys.length === 0) return;
+    setSelectedJourneyId((current) => current ?? timeline.taskJourneys[0]?.id ?? null);
+    for (const journey of timeline.taskJourneys.slice(0, PRELOAD_JOURNEY_DETAILS)) {
+      void loadJourneyDetail(journey.id);
+    }
+  }, [timeline]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -120,6 +132,7 @@ export function App() {
       setTimeline(next);
       setTimelineOffset(next.offset ?? offset);
       setSelectedEvent(next.events[0] ?? null);
+      setSelectedJourneyId(next.taskJourneys[0]?.id ?? null);
       setSelectedRun(null);
       setSelectedNode(null);
       setPlaying(false);
@@ -157,14 +170,44 @@ export function App() {
     setSelectedEvent(replay.events[0] ?? null);
   }
 
+  async function loadJourneyDetail(journeyId: string) {
+    if (journeyDetails[journeyId] || journeyLoadingIds[journeyId]) return;
+    setJourneyLoadingIds((current) => ({ ...current, [journeyId]: true }));
+    try {
+      const detail = await fetchTaskJourneyDetail(journeyId);
+      setJourneyDetails((current) => ({ ...current, [journeyId]: detail }));
+      setError(null);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : String(loadError));
+    } finally {
+      setJourneyLoadingIds((current) => ({ ...current, [journeyId]: false }));
+    }
+  }
+
+  function selectJourney(journeyId: string) {
+    setSelectedJourneyId(journeyId);
+    void loadJourneyDetail(journeyId);
+    const summary = timeline?.taskJourneys.find((journey) => journey.id === journeyId);
+    const promptEvent = summary ? eventsById.get(summary.promptEventId) : null;
+    if (promptEvent) {
+      setSelectedNode(null);
+      setSelectedEvent(promptEvent);
+    }
+  }
+
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
-  const eventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
+  const selectedJourney = useMemo(() => timeline?.taskJourneys.find((journey) => journey.id === selectedJourneyId) ?? timeline?.taskJourneys[0] ?? null, [timeline, selectedJourneyId]);
+  const selectedJourneyDetail = selectedJourney ? journeyDetails[selectedJourney.id] : null;
+  const timelineEventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
+  const detailEvents = selectedJourneyDetail?.events ?? [];
+  const eventsById = useMemo(() => mergeEventMaps(timelineEventsById, detailEvents), [timelineEventsById, detailEvents]);
 
   const drawerEvent = selectedNode ? selectedRun?.events.find((event) => event.id === selectedNode.eventId) ?? selectedEvent : selectedEvent;
   const drawerEvidence = eventEvidence?.event.id === drawerEvent?.id ? eventEvidence : null;
   const drawerArtifacts = drawerEvidence?.artifacts ?? selectedRun?.artifacts.filter((artifact) => artifact.eventId === drawerEvent?.id) ?? [];
-  const drawerEvents = useMemo(() => mergeEvents(timeline?.events ?? [], selectedRun?.events ?? []), [timeline, selectedRun]);
-  const causalView = useMemo(() => buildCausalView(drawerEvents, timeline?.causalEdges ?? [], drawerEvent?.id ?? null), [drawerEvents, timeline?.causalEdges, drawerEvent?.id]);
+  const drawerEvents = useMemo(() => mergeEvents(timeline?.events ?? [], selectedRun?.events ?? [], detailEvents), [timeline, selectedRun, detailEvents]);
+  const causalEdges = selectedJourneyDetail?.causalEdges ?? timeline?.causalEdges ?? [];
+  const causalView = useMemo(() => buildCausalView(drawerEvents, causalEdges, drawerEvent?.id ?? null), [drawerEvents, causalEdges, drawerEvent?.id]);
   const totalEvents = timeline?.totalEvents ?? timeline?.events.length ?? 0;
   const currentLimit = timeline?.limit ?? TIMELINE_LIMIT;
   const pageEnd = Math.min(timelineOffset + (timeline?.events.length ?? 0), totalEvents);
@@ -220,7 +263,7 @@ export function App() {
         ) : projects.length === 0 ? (
           <EmptyState title="No Codex runs indexed" detail="Scan local rollout JSONL files from ~/.codex/sessions to build the first timeline." codexHome={codexHome} onCodexHomeChange={setCodexHome} onScan={handleScan} />
         ) : (
-          <div className="dashboard-grid">
+          <div className="dashboard-grid journey-dashboard-grid">
             <aside className="run-ledger">
               <div className="panel-heading">
                 <Database size={17} />
@@ -245,6 +288,22 @@ export function App() {
               </div>
             </aside>
 
+            <aside className="input-navigator">
+              <div className="panel-heading">
+                <Search size={17} />
+                <span>User Inputs</span>
+                <em>{timeline?.taskJourneys.length ?? 0}</em>
+              </div>
+              <div className="input-nav-list">
+                {(timeline?.taskJourneys ?? []).map((journey, index) => (
+                  <button key={journey.id} className={`input-nav-row ${selectedJourney?.id === journey.id ? "active" : ""}`} onClick={() => selectJourney(journey.id)}>
+                    <strong>{journey.title}</strong>
+                    <small>{index + 1} · {journey.eventIds.length} events · {formatExitType(journey.exitType)}</small>
+                  </button>
+                ))}
+              </div>
+            </aside>
+
             <section className="timeline-panel">
               <div className="panel-heading">
                 <FileText size={17} />
@@ -264,11 +323,12 @@ export function App() {
               </div>
               {showCausalPaths ? <CausalRibbon view={causalView} /> : null}
               <TaskJourneyList
-                journeys={timeline?.taskJourneys ?? []}
+                journeys={selectedJourney ? [selectedJourneyDetail?.journey ?? selectedJourney] : []}
                 eventsById={eventsById}
                 selectedEventId={drawerEvent?.id ?? null}
                 causalView={causalView}
                 showCausalPaths={showCausalPaths}
+                loadingJourneyIds={journeyLoadingIds}
                 onSelectEvent={(event) => {
                   setSelectedNode(null);
                   setSelectedEvent(event);
@@ -355,11 +415,18 @@ function walkGraph(seedId: string, edges: CausalEdge[], direction: "upstream" | 
   }
 }
 
-function mergeEvents(primary: TimelineEvent[], secondary: TimelineEvent[]): TimelineEvent[] {
+function mergeEvents(...eventGroups: TimelineEvent[][]): TimelineEvent[] {
   const eventsById = new Map<string, TimelineEvent>();
-  for (const event of primary) eventsById.set(event.id, event);
-  for (const event of secondary) eventsById.set(event.id, event);
+  for (const group of eventGroups) {
+    for (const event of group) eventsById.set(event.id, event);
+  }
   return [...eventsById.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+}
+
+function mergeEventMaps(primary: Map<string, TimelineEvent>, secondary: TimelineEvent[]): Map<string, TimelineEvent> {
+  const eventsById = new Map(primary);
+  for (const event of secondary) eventsById.set(event.id, event);
+  return eventsById;
 }
 
 function eventDotClass(event: TimelineEvent, selectedId: string | null, causalView: CausalView, showCausalPaths: boolean) {
@@ -407,6 +474,7 @@ function TaskJourneyList({
   selectedEventId,
   causalView,
   showCausalPaths,
+  loadingJourneyIds,
   onSelectEvent
 }: {
   journeys: TaskJourney[];
@@ -414,6 +482,7 @@ function TaskJourneyList({
   selectedEventId: string | null;
   causalView: CausalView;
   showCausalPaths: boolean;
+  loadingJourneyIds: Record<string, boolean>;
   onSelectEvent: (event: TimelineEvent) => void;
 }) {
   if (journeys.length === 0) {
@@ -440,7 +509,9 @@ function TaskJourneyList({
               <span>{journey.eventIds.length} events</span>
               <span>{journey.stages.length} stages</span>
               <span>{formatDate(journey.startedAt)} - {formatDate(journey.endedAt)}</span>
+              {loadingJourneyIds[journey.id] ? <span>Loading details</span> : null}
             </div>
+            <p className="journey-summary">{journey.summary}</p>
             <div className="journey-stages">
               {SEMANTIC_LANES.map((lane) => {
                 const stage = journey.stages.find((candidate) => candidate.lane === lane);

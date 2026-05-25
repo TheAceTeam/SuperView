@@ -13,6 +13,7 @@ import {
   RawEventRef,
   RunReplay,
   SessionRecord,
+  TaskJourneyDetail,
   TimelineQuery,
   TimelineEvent,
   TurnRecord
@@ -435,6 +436,24 @@ export class SuperViewDatabase {
       limit: normalizeLimit(query.limit),
       offset: Math.max(0, Math.trunc(query.offset ?? 0))
     };
+  }
+
+  getTaskJourneyDetail(journeyId: string): TaskJourneyDetail | null {
+    const projects = this.listProjects();
+    for (const project of projects) {
+      const events = this.listEvents(project.id);
+      const timeline = buildProjectTimeline(project, events);
+      const journey = timeline.taskJourneys.find((candidate) => candidate.id === journeyId);
+      if (!journey) continue;
+      const eventIds = new Set(journey.eventIds);
+      const journeyEvents = events.filter((event) => eventIds.has(event.id));
+      return {
+        journey,
+        events: journeyEvents,
+        causalEdges: timeline.causalEdges.filter((edge) => eventIds.has(edge.fromEventId) || eventIds.has(edge.toEventId))
+      };
+    }
+    return null;
   }
 
   private timelineWhere(projectId: string, query: TimelineQuery) {

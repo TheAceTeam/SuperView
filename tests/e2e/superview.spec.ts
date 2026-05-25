@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 test("scans fixture logs, renders timeline, opens replay, and toggles theme", async ({ page }) => {
   let timelineRequestCount = 0;
   let evidenceRequested = false;
+  const journeyDetailRequests: string[] = [];
 
   await page.route("**/api/projects/*/timeline?**", async (route) => {
     timelineRequestCount += 1;
@@ -36,7 +37,65 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
       events[0].toolName = null;
       events[0].callId = null;
     }
-    const lastEventInLane = (lane: string) => [...events].reverse().find((event) => event.lane === lane);
+    if (offset === 0) {
+      [75, 150, 225].forEach((index) => {
+        events[index].kind = "user_prompt";
+        events[index].lane = "Product";
+        events[index].title = `User task ${index}`;
+        events[index].detail = `Build task journey from input ${index}`;
+        events[index].toolName = null;
+        events[index].callId = null;
+      });
+    }
+    const taskStarts = offset === 0 ? [0, 75, 150, 225] : [0];
+    const taskJourneySummaries = taskStarts.map((startIndex, taskIndex) => {
+      const taskEvents = events.slice(startIndex, taskStarts[taskIndex + 1] ?? events.length);
+      const prompt = taskEvents[0];
+      return {
+        id: `task-${offset + startIndex}`,
+        projectId: "project-fixture",
+        sessionId: "fixture-tool-session",
+        promptEventId: prompt.id,
+        startedAt: prompt.timestamp,
+        endedAt: taskEvents.at(-1)?.timestamp ?? prompt.timestamp,
+        title: `User task ${offset + startIndex}`,
+        summary: `From user input through ${taskEvents.length} event(s), 3 stage(s), ending at session end.`,
+        status: "success",
+        exitType: "session_end",
+        eventIds: taskEvents.map((event) => event.id),
+        stageCounts: {
+          Product: taskEvents.filter((event) => event.lane === "Product").length,
+          Code: taskEvents.filter((event) => event.lane === "Code").length,
+          "Agent Runs": taskEvents.filter((event) => event.lane === "Agent Runs").length
+        },
+        stages: [
+          {
+            lane: "Product",
+            count: taskEvents.filter((event) => event.lane === "Product").length,
+            status: "success",
+            firstEventId: prompt.id,
+            lastEventId: [...taskEvents].reverse().find((event) => event.lane === "Product")?.id ?? prompt.id,
+            eventIds: taskEvents.filter((event) => event.lane === "Product").map((event) => event.id)
+          },
+          {
+            lane: "Code",
+            count: taskEvents.filter((event) => event.lane === "Code").length,
+            status: "success",
+            firstEventId: taskEvents.find((event) => event.lane === "Code")?.id ?? prompt.id,
+            lastEventId: [...taskEvents].reverse().find((event) => event.lane === "Code")?.id ?? prompt.id,
+            eventIds: taskEvents.filter((event) => event.lane === "Code").map((event) => event.id)
+          },
+          {
+            lane: "Agent Runs",
+            count: taskEvents.filter((event) => event.lane === "Agent Runs").length,
+            status: "success",
+            firstEventId: taskEvents.find((event) => event.lane === "Agent Runs")?.id ?? prompt.id,
+            lastEventId: [...taskEvents].reverse().find((event) => event.lane === "Agent Runs")?.id ?? prompt.id,
+            eventIds: taskEvents.filter((event) => event.lane === "Agent Runs").map((event) => event.id)
+          }
+        ]
+      };
+    });
     const causalEdges =
       offset === 300
         ? [
@@ -88,52 +147,7 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
         ],
         events,
         causalEdges,
-        taskJourneys: [
-          {
-            id: `task-${offset}`,
-            projectId: "project-fixture",
-            sessionId: "fixture-tool-session",
-            promptEventId: events[0].id,
-            startedAt: events[0].timestamp,
-            endedAt: events.at(-1)?.timestamp ?? events[0].timestamp,
-            title: `User task ${offset}`,
-            summary: `From user input through ${events.length} event(s), 3 stage(s), ending at session end.`,
-            status: "success",
-            exitType: "session_end",
-            eventIds: events.map((event) => event.id),
-            stageCounts: {
-              Product: 1,
-              Code: events.filter((event) => event.lane === "Code").length,
-              "Agent Runs": events.filter((event) => event.lane === "Agent Runs").length
-            },
-            stages: [
-              {
-                lane: "Product",
-                count: 1,
-                status: "success",
-                firstEventId: events[0].id,
-                lastEventId: events[0].id,
-                eventIds: [events[0].id]
-              },
-              {
-                lane: "Code",
-                count: events.filter((event) => event.lane === "Code").length,
-                status: "success",
-                firstEventId: events.find((event) => event.lane === "Code")?.id ?? events[0].id,
-                lastEventId: lastEventInLane("Code")?.id ?? events[0].id,
-                eventIds: events.filter((event) => event.lane === "Code").map((event) => event.id)
-              },
-              {
-                lane: "Agent Runs",
-                count: events.filter((event) => event.lane === "Agent Runs").length,
-                status: "success",
-                firstEventId: events.find((event) => event.lane === "Agent Runs")?.id ?? events[0].id,
-                lastEventId: lastEventInLane("Agent Runs")?.id ?? events[0].id,
-                eventIds: events.filter((event) => event.lane === "Agent Runs").map((event) => event.id)
-              }
-            ]
-          }
-        ],
+        taskJourneys: taskJourneySummaries,
         totalEvents: 340,
         limit: 300,
         offset
@@ -187,6 +201,87 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
     });
   });
 
+  await page.route("**/api/task-journeys/*", async (route) => {
+    const journeyId = route.request().url().match(/\/api\/task-journeys\/([^/?]+)/)?.[1] ?? "task-unknown";
+    journeyDetailRequests.push(journeyId);
+    const offset = Number(journeyId.replace("task-", "")) || 0;
+    const baseTime = Date.parse("2026-05-25T02:00:00.000Z");
+    const events = Array.from({ length: offset === 0 ? 300 : 40 }, (_, index) => ({
+      id: `event-${offset + index}`,
+      projectId: "project-fixture",
+      sessionId: "fixture-tool-session",
+      turnId: "turn-1",
+      timestamp: new Date(baseTime + offset * 1000 + index * 1000).toISOString(),
+      kind: index === 0 ? "user_prompt" : index % 3 === 0 ? "tool_call" : "agent_message",
+      lane: index === 0 ? "Product" : index % 2 === 0 ? "Code" : "Agent Runs",
+      title: index === 0 ? `User task ${offset}` : `Loaded detail event ${offset + index}`,
+      detail: `Loaded task detail ${offset + index}`,
+      toolName: index % 3 === 0 && index !== 0 ? "exec_command" : null,
+      callId: index % 3 === 0 && index !== 0 ? `call-${offset + index}` : null,
+      status: "success",
+      files: [],
+      rawEventRefId: `detail-raw-${offset + index}`
+    }));
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        journey: {
+          id: journeyId,
+          projectId: "project-fixture",
+          sessionId: "fixture-tool-session",
+          promptEventId: events[0].id,
+          startedAt: events[0].timestamp,
+          endedAt: events.at(-1)?.timestamp ?? events[0].timestamp,
+          title: `User task ${offset}`,
+          summary: `Loaded dynamic detail for task ${offset}.`,
+          status: "success",
+          exitType: "session_end",
+          eventIds: events.map((event) => event.id),
+          stageCounts: {
+            Product: 1,
+            Code: events.filter((event) => event.lane === "Code").length,
+            "Agent Runs": events.filter((event) => event.lane === "Agent Runs").length
+          },
+          stages: [
+            { lane: "Product", count: 1, status: "success", firstEventId: events[0].id, lastEventId: events[0].id, eventIds: [events[0].id] },
+            {
+              lane: "Code",
+              count: events.filter((event) => event.lane === "Code").length,
+              status: "success",
+              firstEventId: events.find((event) => event.lane === "Code")?.id ?? events[0].id,
+              lastEventId: [...events].reverse().find((event) => event.lane === "Code")?.id ?? events[0].id,
+              eventIds: events.filter((event) => event.lane === "Code").map((event) => event.id)
+            },
+            {
+              lane: "Agent Runs",
+              count: events.filter((event) => event.lane === "Agent Runs").length,
+              status: "success",
+              firstEventId: events.find((event) => event.lane === "Agent Runs")?.id ?? events[0].id,
+              lastEventId: [...events].reverse().find((event) => event.lane === "Agent Runs")?.id ?? events[0].id,
+              eventIds: events.filter((event) => event.lane === "Agent Runs").map((event) => event.id)
+            }
+          ]
+        },
+        events,
+        causalEdges:
+          offset === 300
+            ? [
+                {
+                  id: "detail-edge-300-301",
+                  projectId: "project-fixture",
+                  fromEventId: "event-300",
+                  toEventId: "event-301",
+                  type: "verified_by",
+                  confidence: "inferred",
+                  reason: "Nearest successful verification after this change in the same session.",
+                  evidence: null
+                }
+              ]
+            : []
+      })
+    });
+  });
+
   await page.goto("/");
 
   await page.getByRole("textbox", { name: "Codex home path", exact: true }).fill("tests/fixtures/fake-codex-home");
@@ -194,16 +289,27 @@ test("scans fixture logs, renders timeline, opens replay, and toggles theme", as
 
   await expect(page.getByText(/Ingest completed/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Task Journeys", { exact: true })).toBeVisible();
+  await expect(page.getByText("User Inputs", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /#1 Input to exit User task 0/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /User task 0.*75 events/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /User task 225.*75 events/ })).toBeVisible();
   await expect(page.getByText("Input to exit", { exact: true })).toBeVisible();
-  await expect(page.getByText("Session end")).toBeVisible();
+  await expect(page.getByRole("button", { name: /#1 Input to exit User task 0.*Session end/ })).toBeVisible();
   await expect(page.getByText("Agent Trace", { exact: true })).toBeVisible();
   await expect(page.locator(".lane-label").filter({ hasText: "Agent Runs" })).toHaveCount(0);
   await expect(page.getByText("1-300 of 340")).toBeVisible();
-  await expect(page.getByText("1 task journeys loaded from 300 events")).toBeVisible();
-  await expect(page.getByText("+114 more trace events")).toBeVisible();
+  await expect(page.getByText("4 task journeys loaded from 300 events")).toBeVisible();
+  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-0").length).toBe(1);
+  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-75").length).toBe(1);
+  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-150").length).toBe(1);
+  await expect(journeyDetailRequests).not.toContain("task-225");
+  await page.getByRole("button", { name: /User task 225.*75 events/ }).click();
+  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-225").length).toBe(1);
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByText("301-340 of 340")).toBeVisible();
+  await page.getByRole("button", { name: /User task 300.*40 events/ }).click();
+  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-300").length).toBe(1);
+  await expect(page.getByText("Loaded dynamic detail for task 300.")).toBeVisible();
   await expect(page.getByRole("button", { name: /#1 Input to exit User task 300/ })).toBeVisible();
   await expect(page.getByText("Run Ledger")).toBeVisible();
   await page.getByRole("button", { name: "Show causal paths" }).click();

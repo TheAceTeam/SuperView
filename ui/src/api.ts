@@ -1,4 +1,4 @@
-import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, RunReplay, SessionRecord } from "../../core/types";
+import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, RunReplay, SessionRecord, TaskJourneyDetail } from "../../core/types";
 
 export interface ProjectWithSessions {
   id: string;
@@ -48,6 +48,12 @@ export async function fetchEventEvidence(eventId: string): Promise<EventEvidence
   const response = await fetch(`/api/events/${eventId}/evidence`);
   if (!response.ok) throw new Error("Failed to load event evidence");
   return (await response.json()) as EventEvidence;
+}
+
+export async function fetchTaskJourneyDetail(journeyId: string): Promise<TaskJourneyDetail> {
+  const response = await fetch(`/api/task-journeys/${journeyId}`);
+  if (!response.ok) throw new Error("Failed to load task journey detail");
+  return (await response.json()) as TaskJourneyDetail;
 }
 
 export async function fetchRun(sessionId: string): Promise<RunReplay & { artifacts: Artifact[] }> {

@@ -167,6 +167,12 @@ export interface TaskJourney {
   stages: TaskJourneyStage[];
 }
 
+export interface TaskJourneyDetail {
+  journey: TaskJourney;
+  events: TimelineEvent[];
+  causalEdges: CausalEdge[];
+}
+
 export interface Artifact {
   id: string;
   eventId: string;

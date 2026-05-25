@@ -306,14 +306,18 @@ h1 {
   align-items: start;
 }
 
-.run-ledger, .timeline-panel, .evidence-drawer, .replay-panel {
+.journey-dashboard-grid {
+  grid-template-columns: 220px 280px minmax(0, 1fr) 340px;
+}
+
+.run-ledger, .input-navigator, .timeline-panel, .evidence-drawer, .replay-panel {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: color-mix(in srgb, var(--surface-2) 90%, transparent);
   box-shadow: var(--shadow);
 }
 
-.run-ledger, .evidence-drawer {
+.run-ledger, .input-navigator, .evidence-drawer {
   position: sticky;
   top: 84px;
   max-height: calc(100vh - 104px);
@@ -388,6 +392,41 @@ select {
   display: block;
   margin-top: 3px;
   color: var(--muted);
+}
+
+.input-nav-list {
+  display: grid;
+  gap: 8px;
+}
+
+.input-nav-row {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-height: 62px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.input-nav-row.active {
+  border-color: var(--orange);
+  background: var(--orange-soft);
+}
+
+.input-nav-row strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.input-nav-row small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .episode-strip {
@@ -648,6 +687,12 @@ select {
   padding: 4px 8px;
   border-radius: 999px;
   background: var(--surface-soft);
+}
+
+.journey-summary {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .journey-stages {
@@ -987,7 +1032,7 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .run-ledger, .evidence-drawer {
+  .run-ledger, .input-navigator, .evidence-drawer {
     position: static;
     max-height: none;
   }

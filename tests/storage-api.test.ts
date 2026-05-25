@@ -108,6 +108,13 @@ describe("SuperView API", () => {
         })
       ])
     );
+
+    const firstJourney = fullTimeline.body.taskJourneys[0];
+    const journeyDetail = await request(app).get(`/api/task-journeys/${firstJourney.id}`);
+    expect(journeyDetail.status).toBe(200);
+    expect(journeyDetail.body.journey.id).toBe(firstJourney.id);
+    expect(journeyDetail.body.events.map((event: { id: string }) => event.id)).toEqual(firstJourney.eventIds);
+    expect(Array.isArray(journeyDetail.body.causalEdges)).toBe(true);
   });
 
   it("adds git commits to the project timeline when sessions belong to a git repo", async () => {
