@@ -1,0 +1,1945 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SuperView Design Preview - C Replay Driven</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #fcfaf7;
+      --surface: #f3f4f6;
+      --surface-2: #ffffff;
+      --surface-soft: #edebe9;
+      --line: #e3e0dd;
+      --line-strong: #d1d5dc;
+      --ink: #423d38;
+      --muted: #797067;
+      --teal: #fe6e00;
+      --teal-soft: #fff1e5;
+      --amber: #ff6b00;
+      --amber-soft: #fff3d6;
+      --cobalt: #3080ff;
+      --cobalt-soft: #dbeafe;
+      --success: #00c758;
+      --error: #fb2c36;
+      --brick: #fe6e00;
+      --brick-dark: #9f3a00;
+      --coin: #ffb74d;
+      --pipe: #00c758;
+      --sky: #fef9c2;
+      --shell: rgba(0, 0, 0, .70);
+      --shell-border: rgba(255, 255, 255, .10);
+      --on-shell: #ffffff;
+      --shadow: rgba(0, 0, 0, .10);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --font-display: ui-sans-serif, system-ui, sans-serif;
+      --font-body: ui-sans-serif, system-ui, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --paper: #413830;
+      --surface: #4a423a;
+      --surface-2: #554d45;
+      --surface-soft: #3a332d;
+      --line: #63594f;
+      --line-strong: #7b7065;
+      --ink: #fafaf9;
+      --muted: #b9b3ac;
+      --teal: #fe6e00;
+      --teal-soft: #5a3218;
+      --amber: #ff6b00;
+      --amber-soft: #4c3018;
+      --cobalt: #7ab2ff;
+      --cobalt-soft: #26384e;
+      --success: #00c758;
+      --error: #fb2c36;
+      --brick: #fe6e00;
+      --brick-dark: #9f3a00;
+      --coin: #ffb74d;
+      --pipe: #00c758;
+      --sky: #2f3f4b;
+      --shell: rgba(0, 0, 0, .76);
+      --shell-border: rgba(255, 255, 255, .14);
+      --on-shell: #ffffff;
+      --shadow: rgba(0, 0, 0, .38);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--line) 35%, transparent) 1px, transparent 1px),
+        linear-gradient(180deg, color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.5;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--shell-border);
+      background: var(--shell);
+      color: var(--on-shell);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand strong {
+      font-family: var(--font-display);
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .brand span {
+      color: rgba(255, 255, 255, .70);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .theme-toggle {
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid rgba(255, 255, 255, .18);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, .10);
+      color: var(--on-shell);
+      cursor: pointer;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      align-items: start;
+      padding: 36px 32px 28px;
+      min-height: 0;
+    }
+
+    .hero-copy {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px 28px;
+      align-items: end;
+      max-width: none;
+    }
+
+    .hero-text {
+      min-width: 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 18px;
+      color: var(--teal);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 32px;
+      height: 1px;
+      background: var(--teal);
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(44px, 7vw, 80px);
+      font-weight: 600;
+      max-width: none;
+    }
+
+    .lead {
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 20px;
+      max-width: 920px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 0;
+      justify-content: flex-end;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button.primary {
+      border-color: var(--amber);
+      background: var(--amber);
+      color: #fffdf7;
+    }
+
+    .app-frame {
+      overflow: hidden;
+      border: 1px solid var(--shell-border);
+      border-radius: 0;
+      background: var(--surface-2);
+      box-shadow: 0 20px 25px rgba(0, 0, 0, .10), 0 8px 10px rgba(0, 0, 0, .04);
+      min-width: 0;
+    }
+
+    .app-chrome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 44px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--shell-border);
+      background: var(--shell);
+      color: rgba(255, 255, 255, .70);
+      backdrop-filter: blur(12px);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .chrome-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .chrome-dots i {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--line-strong);
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 220px minmax(420px, 1fr) 300px;
+      min-height: 560px;
+    }
+
+    .rail,
+    .inspector {
+      background: var(--shell);
+      color: var(--on-shell);
+      backdrop-filter: blur(12px);
+    }
+
+    .rail {
+      border-right: 1px solid var(--shell-border);
+      padding: 12px;
+    }
+
+    .inspector {
+      border-left: 1px solid var(--shell-border);
+      padding: 14px;
+    }
+
+    .main-view {
+      padding: 16px;
+      min-width: 0;
+    }
+
+    .timeline-board {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--line) 54%, transparent) 1px, transparent 1px),
+        var(--surface-2);
+      background-size: 96px 100%;
+    }
+
+    .timeline-axis {
+      display: grid;
+      grid-template-columns: 92px repeat(5, 1fr);
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 8px;
+      align-items: center;
+      min-height: 48px;
+    }
+
+    .lane-label {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .lane-track {
+      position: relative;
+      min-height: 46px;
+      border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface) 54%, transparent);
+      overflow: hidden;
+    }
+
+    .event-pill {
+      position: absolute;
+      top: 8px;
+      min-height: 28px;
+      padding: 6px 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 8px 14px var(--shadow);
+    }
+
+    .event-pill.product { border-color: var(--cobalt); background: var(--cobalt-soft); }
+    .event-pill.arch { border-color: var(--teal); background: var(--teal-soft); }
+    .event-pill.code { border-color: var(--line-strong); }
+    .event-pill.run { border-color: var(--brick-dark); background: color-mix(in srgb, var(--brick) 12%, var(--surface-2)); }
+    .event-pill.verify { border-color: var(--success); background: color-mix(in srgb, var(--success) 18%, var(--surface-2)); }
+    .event-pill.risk { border-color: var(--error); background: color-mix(in srgb, var(--error) 18%, var(--surface-2)); }
+
+    .risk-thread {
+      position: absolute;
+      left: 28%;
+      right: 14%;
+      top: 20px;
+      height: 4px;
+      border-radius: 9999px;
+      background: repeating-linear-gradient(90deg, var(--error) 0 12px, transparent 12px 20px);
+    }
+
+    .episode-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .episode {
+      min-height: 88px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+    }
+
+    .episode strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .episode span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .rail .panel-title,
+    .inspector .panel-title {
+      color: var(--on-shell);
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .session-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .progress-card {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, .10);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, .08);
+    }
+
+    .rank-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .rank-row strong {
+      font-family: var(--font-display);
+      font-size: 18px;
+    }
+
+    .rank-row span {
+      color: rgba(255, 255, 255, .70);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .level-bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, .15);
+    }
+
+    .level-bar i {
+      display: block;
+      width: 68%;
+      height: 100%;
+      background: var(--amber);
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .mini-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border: 1px solid rgba(255, 255, 255, .14);
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, .10);
+      color: rgba(255, 255, 255, .78);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .session-row {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border: 1px solid rgba(255, 255, 255, .10);
+      border-radius: var(--radius-md);
+      background: transparent;
+    }
+
+    .session-row.active {
+      border-color: var(--amber);
+      background: var(--amber);
+      color: var(--on-shell);
+    }
+
+    .session-row strong {
+      font-size: 13px;
+    }
+
+    .session-row span {
+      color: rgba(255, 255, 255, .65);
+      font-size: 11px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      min-height: 76px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 20px;
+    }
+
+    .trace-map {
+      position: relative;
+      min-height: 284px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--sky) 44%, var(--surface-2)) 0 68%, color-mix(in srgb, var(--teal-soft) 45%, transparent) 68% 100%),
+        linear-gradient(90deg, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px),
+        linear-gradient(180deg, color-mix(in srgb, var(--line) 45%, transparent) 1px, transparent 1px),
+        var(--surface-2);
+      background-size: 44px 44px;
+    }
+
+    .run-drilldown {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .map-line {
+      position: absolute;
+      left: 26px;
+      right: 26px;
+      top: 192px;
+      height: 24px;
+      border: 2px solid var(--brick-dark);
+      border-radius: var(--radius-sm);
+      background:
+        linear-gradient(90deg, transparent 0 47%, var(--brick-dark) 47% 53%, transparent 53% 100%),
+        linear-gradient(180deg, transparent 0 47%, var(--brick-dark) 47% 53%, transparent 53% 100%),
+        var(--brick);
+      background-size: 44px 24px;
+    }
+
+    .map-branch {
+      position: absolute;
+      left: 52%;
+      top: 126px;
+      width: 84px;
+      height: 66px;
+      border-left: 2px dashed var(--line-strong);
+      border-top: 2px dashed var(--line-strong);
+      background: transparent;
+    }
+
+    .agent-sprite {
+      position: absolute;
+      left: 43%;
+      top: 148px;
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 2px solid var(--ink);
+      border-radius: 50% 50% 9px 9px;
+      background: var(--amber);
+      color: #fffdf7;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 10px 18px var(--shadow);
+      transition: left 420ms cubic-bezier(.65,0,.35,1), top 420ms cubic-bezier(.65,0,.35,1), transform 220ms ease;
+    }
+
+    .agent-sprite.hit {
+      transform: translateY(8px) rotate(-8deg);
+      background: var(--error);
+    }
+
+    .agent-sprite.boost {
+      transform: translateY(-12px) scale(1.12);
+      background: var(--coin);
+      color: #171511;
+    }
+
+    .agent-sprite.clear {
+      transform: translateY(-8px) scale(1.08);
+      background: var(--success);
+    }
+
+    .agent-sprite::before,
+    .agent-sprite::after {
+      content: "";
+      position: absolute;
+      top: 11px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #fffdf7;
+    }
+
+    .agent-sprite::before {
+      left: 9px;
+    }
+
+    .agent-sprite::after {
+      right: 9px;
+    }
+
+    .pit {
+      position: absolute;
+      left: 68%;
+      top: 192px;
+      width: 64px;
+      height: 54px;
+      border: 1px solid var(--error);
+      border-top: 0;
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--error) 20%, transparent) 0 8px, transparent 8px 16px);
+    }
+
+    .coin {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 28px;
+      border: 2px solid color-mix(in srgb, var(--coin) 70%, #5f4300);
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #fff4a8 0 14%, var(--coin) 15% 100%);
+      color: #5f4300;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      box-shadow: 0 6px 12px var(--shadow);
+    }
+
+    .coin.c1 { left: 26%; top: 82px; }
+    .coin.c2 { left: 33%; top: 70px; }
+    .coin.c3 { left: 60%; top: 84px; }
+
+    .question-block {
+      position: absolute;
+      left: 39%;
+      top: 72px;
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border: 3px solid #875200;
+      border-radius: var(--radius-sm);
+      background: #f5ad24;
+      color: #5c3500;
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .12), 0 8px 16px var(--shadow);
+    }
+
+    .pipe {
+      position: absolute;
+      left: 77%;
+      top: 142px;
+      width: 56px;
+      height: 52px;
+      border: 3px solid color-mix(in srgb, var(--pipe) 68%, #113f1e);
+      border-radius: 8px 8px 0 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.28) 0 22%, transparent 23% 100%),
+        var(--pipe);
+      box-shadow: inset -8px 0 0 rgba(0, 0, 0, .16);
+    }
+
+    .pipe::before {
+      content: "";
+      position: absolute;
+      left: -8px;
+      right: -8px;
+      top: -16px;
+      height: 18px;
+      border: 3px solid color-mix(in srgb, var(--pipe) 68%, #113f1e);
+      border-radius: 8px;
+      background: var(--pipe);
+    }
+
+    .mushroom {
+      position: absolute;
+      left: 48%;
+      top: 120px;
+      width: 34px;
+      height: 30px;
+      border-radius: 18px 18px 9px 9px;
+      border: 2px solid var(--ink);
+      background:
+        radial-gradient(circle at 28% 38%, #fffdf7 0 12%, transparent 13%),
+        radial-gradient(circle at 70% 36%, #fffdf7 0 12%, transparent 13%),
+        #d94b37;
+      box-shadow: 0 8px 16px var(--shadow);
+    }
+
+    .mushroom::after {
+      content: "";
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      bottom: -6px;
+      height: 12px;
+      border: 2px solid var(--ink);
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+      background: #fffdf7;
+    }
+
+    .proof-flag {
+      position: absolute;
+      right: 28px;
+      top: 88px;
+      width: 54px;
+      height: 96px;
+      border-left: 3px solid var(--ink);
+    }
+
+    .proof-flag::before {
+      content: "finish";
+      position: absolute;
+      left: 3px;
+      top: 0;
+      min-width: 52px;
+      padding: 4px 6px;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      background: var(--success);
+      color: #fffdf7;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .belt {
+      position: absolute;
+      left: 28px;
+      right: 28px;
+      bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface) 86%, transparent);
+    }
+
+    .belt span {
+      min-height: 26px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .belt span.stall {
+      border-color: var(--amber);
+      background: var(--amber-soft);
+      color: var(--ink);
+    }
+
+    .belt span.done {
+      border-color: var(--teal);
+      background: var(--teal-soft);
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .replay-controls {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      font-size: 12px;
+    }
+
+    .play-button {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--amber);
+      border-radius: var(--radius-md);
+      background: var(--amber);
+      color: #fffdf7;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .replay-track {
+      position: relative;
+      height: 8px;
+      overflow: hidden;
+      border-radius: 9999px;
+      background: var(--line);
+    }
+
+    .replay-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--amber);
+      transition: width 420ms cubic-bezier(.65,0,.35,1);
+    }
+
+    .replay-note {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      min-width: 116px;
+      text-align: right;
+    }
+
+    .node {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 64px;
+      min-height: 44px;
+      padding: 6px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 8px 18px var(--shadow);
+    }
+
+    .node.active {
+      border-color: var(--teal);
+      background: var(--teal);
+      color: #fffdf7;
+    }
+
+    .node.warn {
+      border-color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .node.error {
+      border-color: var(--error);
+      background: color-mix(in srgb, var(--error) 16%, var(--surface-2));
+    }
+
+    .node.info {
+      border-color: var(--cobalt);
+      background: var(--cobalt-soft);
+    }
+
+    .node.n1 { left: 6%; top: 116px; }
+    .node.n2 { left: 23%; top: 116px; }
+    .node.n3 { left: 40%; top: 116px; }
+    .node.n4 { left: 57%; top: 116px; }
+    .node.n5 { left: 74%; top: 116px; }
+    .node.n6 { left: 50%; top: 204px; }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 74px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      font-size: 12px;
+    }
+
+    .scrubber {
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, var(--amber) 0 58%, var(--line) 58% 100%);
+    }
+
+    .inspector-block {
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .inspector-block:first-of-type {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .inspector h3 {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    .inspector h3,
+    .inspector p {
+      color: var(--on-shell);
+    }
+
+    .shell-copy {
+      margin: 0;
+      color: rgba(255, 255, 255, .82);
+      font-size: 13px;
+    }
+
+    .inspector .kv span:nth-child(odd),
+    .inspector .quest span,
+    .inspector .codebox {
+      color: rgba(255, 255, 255, .70);
+    }
+
+    .inspector .inspector-block {
+      border-top-color: rgba(255, 255, 255, .10);
+    }
+
+    .inspector .quest {
+      border-color: rgba(255, 255, 255, .10);
+      background: rgba(255, 255, 255, .08);
+    }
+
+    .inspector .quest strong {
+      color: var(--on-shell);
+    }
+
+    .inspector .quest mark {
+      background: var(--amber);
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 6px 10px;
+      font-size: 12px;
+    }
+
+    .kv span:nth-child(odd) {
+      color: var(--muted);
+    }
+
+    .codebox {
+      margin: 8px 0 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--paper) 72%, var(--surface-2));
+      color: var(--ink);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      overflow-x: auto;
+    }
+
+    .quest-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .quest {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 8px;
+      align-items: start;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+      font-size: 12px;
+    }
+
+    .quest mark {
+      display: grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      margin-top: 1px;
+      border-radius: 50%;
+      background: var(--teal);
+      color: #fffdf7;
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .quest.pending mark {
+      background: var(--line-strong);
+    }
+
+    .quest strong {
+      display: block;
+      font-size: 12px;
+    }
+
+    .quest span {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    .quest em {
+      color: var(--amber);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-style: normal;
+      white-space: nowrap;
+    }
+
+    .section {
+      padding: 42px 32px;
+      border-top: 1px solid var(--line);
+    }
+
+    .section h2 {
+      font-family: var(--font-display);
+      font-size: clamp(28px, 4vw, 48px);
+      margin-bottom: 10px;
+    }
+
+    .section-intro {
+      max-width: 760px;
+      color: var(--muted);
+      margin: 0 0 24px;
+      font-size: 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .specimen,
+    .component-panel,
+    .palette-swatch {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      padding: 16px;
+    }
+
+    .specimen span,
+    .palette-swatch span {
+      display: block;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .display-sample {
+      font-family: var(--font-display);
+      font-size: 34px;
+      line-height: 1.05;
+    }
+
+    .body-sample {
+      font-size: 17px;
+      color: var(--muted);
+    }
+
+    .mono-sample {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .palette {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .chip {
+      min-height: 82px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      color: #fffdf7;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .chip.light {
+      color: #171511;
+    }
+
+    .component-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 14px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .input-row {
+      display: grid;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .input-row label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .input-row input,
+    .input-row select {
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    .alert {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-left-width: 4px;
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .alert.success { border-left-color: var(--success); }
+    .alert.warning { border-left-color: var(--amber); }
+    .alert.error { border-left-color: var(--error); }
+    .alert.info { border-left-color: var(--cobalt); }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      font-size: 13px;
+    }
+
+    .compare-table th,
+    .compare-table td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+
+    .compare-table th {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .gamify-shell {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 14px;
+    }
+
+    .case-card,
+    .pattern-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      padding: 16px;
+    }
+
+    .case-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .case-item {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+
+    .stamp {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      background: var(--paper);
+      color: var(--teal);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .case-item strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .case-item span {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .pattern-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .pattern {
+      padding: 10px;
+      border-left: 4px solid var(--cobalt);
+      background: var(--surface);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      font-size: 13px;
+    }
+
+    .pattern strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .pattern span {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .verdict-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .verdict-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface-2);
+      padding: 16px;
+    }
+
+    .score-ring {
+      display: grid;
+      place-items: center;
+      width: 132px;
+      height: 132px;
+      margin: 8px auto 16px;
+      border: 12px solid var(--line);
+      border-top-color: var(--teal);
+      border-right-color: var(--teal);
+      border-radius: 50%;
+      font-family: var(--font-mono);
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .verdict-field {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .verdict-field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .verdict-field textarea {
+      min-height: 86px;
+      resize: vertical;
+      padding: 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      background: var(--paper);
+      color: var(--ink);
+      font: 13px/1.45 var(--font-body);
+    }
+
+    .footer-note {
+      padding: 24px 32px 42px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1050px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .dashboard {
+        grid-template-columns: 160px minmax(0, 1fr);
+      }
+
+      .inspector {
+        grid-column: 1 / -1;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .grid,
+      .component-grid,
+      .gamify-shell,
+      .verdict-grid,
+      .episode-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .palette {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .brand {
+        display: grid;
+        gap: 4px;
+      }
+
+      .brand span {
+        white-space: normal;
+      }
+
+      .hero,
+      .section {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .rail {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .palette {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .trace-map {
+        min-height: 340px;
+      }
+
+      .node {
+        width: 58px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>SuperView</strong>
+      <span>Project Timeline · Agent Run</span>
+    </div>
+    <button class="theme-toggle" type="button" aria-label="Toggle color theme" id="themeToggle">Dark theme</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="hero-text">
+          <p class="eyebrow">Complex engineering timeline</p>
+          <h1>SuperView</h1>
+          <p class="lead">A from-start-to-now engineering timeline for complex projects. See product decisions, architecture, code, agent runs, verification, deploys, and risks in one story, then replay any run as a Mario-like level.</p>
+        </div>
+        <div class="hero-actions" aria-label="Preview actions">
+          <a class="button primary" href="#dashboard-preview">Explore timeline</a>
+          <a class="button" href="#system">View system tokens</a>
+        </div>
+      </div>
+
+      <div class="app-frame" id="dashboard-preview" aria-label="SuperView platformer game mockup">
+        <div class="app-chrome">
+          <div class="chrome-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+          <span>project_timeline · start → now</span>
+          <span>42 events · 6 risk threads</span>
+        </div>
+
+        <div class="dashboard">
+          <aside class="rail">
+            <div class="progress-card">
+              <div class="rank-row"><strong>Build Jumper</strong><span>LVL 4</span></div>
+              <div class="level-bar" aria-label="Level progress 68 percent"><i></i></div>
+              <div class="badge-row" aria-label="Recent badges">
+                <span class="mini-badge">First Clear</span>
+                <span class="mini-badge">Loop Breaker</span>
+                <span class="mini-badge">3-run</span>
+              </div>
+            </div>
+            <div class="panel-title"><span>Timeline Range</span><span class="mono">now</span></div>
+            <div class="session-list">
+              <div class="session-row active">
+                <strong>Full project</strong>
+                <span class="mono">start → now · 42 events</span>
+              </div>
+              <div class="session-row">
+                <strong>Prototype sprint</strong>
+                <span class="mono">12 events · 3 agent runs</span>
+              </div>
+              <div class="session-row">
+                <strong>Animation decision</strong>
+                <span class="mono">A/B test · C selected</span>
+              </div>
+              <div class="session-row">
+                <strong>Risk threads</strong>
+                <span class="mono">6 open · 2 resolved</span>
+              </div>
+            </div>
+          </aside>
+
+          <section class="main-view">
+            <div class="metrics">
+              <div class="metric"><span>Episodes</span><strong>7</strong></div>
+              <div class="metric"><span>Agent runs</span><strong>14</strong></div>
+              <div class="metric"><span>Milestones</span><strong>9</strong></div>
+              <div class="metric"><span>Open risks</span><strong>6</strong></div>
+            </div>
+
+            <div class="panel-title">
+              <span>Project Timeline</span>
+              <span class="mono">start → 2026-05-25</span>
+            </div>
+
+            <div class="timeline-board" aria-label="Project development timeline">
+              <div class="timeline-axis">
+                <span></span>
+                <span>start</span>
+                <span>design</span>
+                <span>prototype</span>
+                <span>animation</span>
+                <span>now</span>
+              </div>
+              <div class="lane">
+                <div class="lane-label">Product</div>
+                <div class="lane-track">
+                  <div class="event-pill product" style="left:3%;">Codex log visualizer</div>
+                  <div class="event-pill product" style="left:43%;">Mario-like pivot</div>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-label">Architecture</div>
+                <div class="lane-track">
+                  <div class="event-pill arch" style="left:18%;">Design system</div>
+                  <div class="event-pill arch" style="left:66%;">Timeline base</div>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-label">Code</div>
+                <div class="lane-track">
+                  <div class="event-pill code" style="left:26%;">Preview HTML</div>
+                  <div class="event-pill code" style="left:58%;">Replay JS</div>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-label">Agent Runs</div>
+                <div class="lane-track">
+                  <div class="event-pill run" style="left:34%;">B ambient</div>
+                  <div class="event-pill run" style="left:51%;">C replay</div>
+                  <div class="event-pill run" style="left:76%;">timeline run</div>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-label">Verify</div>
+                <div class="lane-track">
+                  <div class="event-pill verify" style="left:61%;">C selected</div>
+                  <div class="event-pill verify" style="left:84%;">preview opened</div>
+                </div>
+              </div>
+              <div class="lane">
+                <div class="lane-label">Risks</div>
+                <div class="lane-track">
+                  <div class="risk-thread" aria-label="Long running risk thread"></div>
+                  <div class="event-pill risk" style="left:30%;">scope drift</div>
+                  <div class="event-pill risk" style="left:70%;">timeline depth</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="episode-strip">
+              <div class="episode">
+                <strong>Episode 01 · Product frame</strong>
+                <span>SuperView named · target user: Codex users</span>
+              </div>
+              <div class="episode">
+                <strong>Episode 02 · Game metaphor</strong>
+                <span>generic gamify rejected · platformer chosen</span>
+              </div>
+              <div class="episode">
+                <strong>Episode 03 · Motion system</strong>
+                <span>A/B variants generated · C selected</span>
+              </div>
+            </div>
+
+            <div class="run-drilldown">
+              <div class="panel-title">
+                <span>Selected Run Replay</span>
+                <span class="mono">level_042 · C replay</span>
+              </div>
+
+              <div class="trace-map" aria-label="Agent run level">
+              <div class="map-line"></div>
+              <div class="map-branch"></div>
+              <div class="node n1 info">context block</div>
+              <div class="node n2">read jump</div>
+              <div class="node n3 active">mushroom patch</div>
+              <div class="node n4 warn">test pit</div>
+              <div class="node n5">proof flag</div>
+              <div class="node n6 error">loop trap</div>
+              <div class="coin c1">$</div>
+              <div class="coin c2">$</div>
+              <div class="coin c3">$</div>
+              <div class="question-block">?</div>
+              <div class="mushroom" aria-label="Mushroom patch power-up"></div>
+              <div class="pipe" aria-label="Context pipe"></div>
+              <div class="agent-sprite" aria-label="Agent sprite" id="agentSprite"></div>
+              <div class="pit" aria-label="Failure pit"></div>
+              <div class="proof-flag" aria-label="Proof flag"></div>
+              <div class="belt" aria-label="Factory workflow strip">
+                <span data-belt-step="0">context</span>
+                <span data-belt-step="1">read</span>
+                <span data-belt-step="2">patch</span>
+                <span data-belt-step="3">test</span>
+                <span class="stall" data-belt-step="4">verify</span>
+                <span data-belt-step="5">answer</span>
+              </div>
+            </div>
+
+            <div class="replay-controls">
+              <button class="play-button" id="playRun" type="button">Play run</button>
+              <div class="replay-track" aria-label="Replay progress"><div class="replay-fill" id="replayFill"></div></div>
+              <div class="replay-note" id="replayNote">spawn</div>
+            </div>
+
+            <div class="timeline">
+              <span class="mono">10:58</span>
+              <div class="scrubber" role="img" aria-label="Replay progress 58 percent"></div>
+              <span class="mono">18:42</span>
+            </div>
+            </div>
+          </section>
+
+          <aside class="inspector">
+            <div class="inspector-block">
+              <div class="panel-title"><span>Evidence Drawer</span><span class="mono">T-031</span></div>
+              <h3>Timeline base promoted</h3>
+              <div class="kv">
+                <span>Type</span><span>Product pivot</span>
+                <span>Source</span><span>User clarification</span>
+                <span>Files</span><span class="mono">DESIGN.md, HTML</span>
+                <span>Impact</span><span>Primary IA changed</span>
+              </div>
+            </div>
+
+            <div class="inspector-block">
+              <div class="panel-title"><span>Narrative Summary</span><span class="mono">range: all</span></div>
+              <p class="shell-copy">The project moved from Codex log dashboard to Mario-like replay, then expanded to a full engineering timeline for complex project history. Agent Run is now a drill-down, not the base view.</p>
+            </div>
+
+            <div class="inspector-block">
+              <div class="panel-title"><span>Selected Run</span></div>
+              <p class="shell-copy">Open the replay level to see how a single agent run crossed tool bricks, hit a verification gap, and advanced the timeline.</p>
+            </div>
+
+            <div class="inspector-block">
+              <div class="panel-title"><span>Timeline Objectives</span><span class="mono">3/4</span></div>
+              <div class="quest-list">
+                <div class="quest">
+                  <mark>✓</mark>
+                  <div><strong>Identify episodes</strong><span>7 grouped</span></div>
+                  <em>+12 xp</em>
+                </div>
+                <div class="quest">
+                  <mark>✓</mark>
+                  <div><strong>Link evidence</strong><span>DESIGN.md + previews</span></div>
+                  <em>+8 xp</em>
+                </div>
+                <div class="quest pending">
+                  <mark>·</mark>
+                  <div><strong>Resolve risk thread</strong><span>timeline depth open</span></div>
+                  <em>open</em>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="system">
+      <h2>Typography</h2>
+      <p class="section-intro">The type system follows the command-center reference: fast-loading system sans for dense operations, system monospace for code, timestamps, and telemetry.</p>
+      <div class="grid">
+        <div class="specimen">
+          <span>System Sans / Display</span>
+          <div class="display-sample">Every project has a timeline.</div>
+        </div>
+        <div class="specimen">
+          <span>System Sans / UI</span>
+          <div class="body-sample">Every engineering episode should explain what changed, why it changed, and what evidence proves the result.</div>
+        </div>
+        <div class="specimen">
+          <span>System Mono / Data</span>
+          <div class="mono-sample">00:12:44 PATCH src/app/page.tsx +42 -18</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Color</h2>
+      <p class="section-intro">SuperView now follows the command-center palette: warm off-white workspace, dark frosted shell, concentrated orange telemetry, and soft status colors.</p>
+      <div class="palette">
+        <div class="chip light" style="background:#fcfaf7;">Workspace<br>#FCFAF7</div>
+        <div class="chip light" style="background:#f3f4f6;">Surface<br>#F3F4F6</div>
+        <div class="chip" style="background:#000000;">Frosted Shell<br>rgba(0,0,0,.70)</div>
+        <div class="chip" style="background:#fe6e00;">Telemetry Orange<br>#FE6E00</div>
+        <div class="chip" style="background:#ff6b00;">Action Orange<br>#FF6B00</div>
+        <div class="chip light" style="background:#ffb74d;">Warm Signal<br>#FFB74D</div>
+        <div class="chip" style="background:#413830;">Dark Workspace<br>#413830</div>
+        <div class="chip" style="background:#4a423a;">Dark Surface<br>#4A423A</div>
+        <div class="chip" style="background:#00c758;">Production<br>#00C758</div>
+        <div class="chip light" style="background:#edb200;">Warning<br>#EDB200</div>
+        <div class="chip" style="background:#fb2c36;">Danger<br>#FB2C36</div>
+        <div class="chip" style="background:#3080ff;">Info<br>#3080FF</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Components</h2>
+      <p class="section-intro">Controls are quiet, dense, and explicit. Nothing should look more important than the log evidence itself.</p>
+      <div class="component-grid">
+        <div class="component-panel">
+          <div class="panel-title"><span>Controls</span></div>
+          <div class="controls">
+            <button class="button primary" type="button">Replay selected</button>
+            <button class="button" type="button">Compare run</button>
+            <button class="button" type="button">Export trace</button>
+          </div>
+          <div class="input-row">
+            <label for="filter">Filter events</label>
+            <input id="filter" value="type:patch status:unverified">
+          </div>
+          <div class="input-row">
+            <label for="view">View mode</label>
+            <select id="view">
+              <option>Trace map</option>
+              <option>Transcript</option>
+              <option>Run comparison</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="component-panel">
+          <div class="panel-title"><span>States</span></div>
+          <div class="alert success"><strong>Verified:</strong> tests and build passed after patch.</div>
+          <div class="alert warning"><strong>Needs review:</strong> browser check was skipped.</div>
+          <div class="alert error"><strong>Failed:</strong> parser dropped one user interrupt event.</div>
+          <div class="alert info"><strong>Context:</strong> 4 related sessions share this file path.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Participation Layer</h2>
+      <p class="section-intro">SuperView is playable because the real workflow becomes a platform level. Users replay Codex runs, cross tool-call bricks, avoid failure pits, collect context coins, grab patch mushrooms, and reach the finish flag.</p>
+      <div class="gamify-shell">
+        <div class="case-card">
+          <div class="panel-title"><span>Level Flow</span><span class="mono">level_042</span></div>
+          <div class="case-grid">
+            <div class="case-item">
+              <div class="stamp">01</div>
+              <div><strong>Spawn</strong><span>User goal, branch, model, and flag position</span></div>
+            </div>
+            <div class="case-item">
+              <div class="stamp">02</div>
+              <div><strong>Traversal</strong><span>Jump through bricks, pipes, pits, and boosts</span></div>
+            </div>
+            <div class="case-item">
+              <div class="stamp">03</div>
+              <div><strong>Factory belt</strong><span>Watch workflow inputs turn into outputs</span></div>
+            </div>
+            <div class="case-item">
+              <div class="stamp">04</div>
+              <div><strong>Clear</strong><span>Touch the finish flag and save route pattern</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pattern-card">
+          <div class="panel-title"><span>Pattern Codex</span><span class="mono">18 cards</span></div>
+          <div class="badge-row" style="margin-bottom:12px;">
+            <span class="mini-badge">Pit Jumper</span>
+            <span class="mini-badge">Flag Runner</span>
+            <span class="mini-badge">Tool Route Mapper</span>
+            <span class="mini-badge">Loop Breaker</span>
+          </div>
+          <div class="pattern-list">
+            <div class="pattern">
+              <strong>Pipe card: Documentation Tunnel</strong>
+              <span>Seen in 4 sessions · higher risk on unfamiliar repos</span>
+            </div>
+            <div class="pattern">
+              <strong>Power-up card: User Interrupt Mushroom</strong>
+              <span>Saved from run_2026-05-25 · source event E-014</span>
+            </div>
+            <div class="pattern">
+              <strong>Trap card: Claimed Clear Without Flag Touch</strong>
+              <span>Audit rule created · require visual evidence</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Route Review</h2>
+      <p class="section-intro">A run needs a finish condition. The player reviews why the agent cleared, stalled, looped, or reached the end without proof.</p>
+      <div class="verdict-grid">
+        <div class="verdict-panel">
+          <div class="panel-title"><span>Save Route Pattern</span><span class="mono">level_042</span></div>
+          <div class="verdict-field">
+            <label for="rootcause">Route pattern</label>
+            <textarea id="rootcause">Agent reached the final answer platform without touching the browser-proof finish flag.</textarea>
+          </div>
+          <div class="verdict-field">
+            <label for="turningpoint">Key obstacle</label>
+            <input id="turningpoint" value="E-028 · skipped browser check after patch">
+          </div>
+          <div class="verdict-field">
+            <label for="confidence">Clear status</label>
+            <select id="confidence">
+              <option>Partial clear · missing flag touch</option>
+              <option>Verified clear · all proof collected</option>
+              <option>Failed run · fell into loop trap</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="verdict-panel">
+          <div class="panel-title"><span>Clear Review</span><span class="mono">partial</span></div>
+          <div class="score-ring">72%</div>
+          <div class="alert success"><strong>Strong route:</strong> context coins and patch mushroom were collected.</div>
+          <div class="alert warning"><strong>Missing flag:</strong> no screenshot or browser trace was collected.</div>
+          <div class="alert info"><strong>Unlock:</strong> Flag Runner badge after one proof check.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Run Comparison</h2>
+      <p class="section-intro">SuperView should make two agent runs comparable at a glance, including where behavior diverged.</p>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Signal</th>
+            <th>Run A</th>
+            <th>Run B</th>
+            <th>Delta</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>First useful patch</td>
+            <td class="mono">08:42</td>
+            <td class="mono">03:19</td>
+            <td>Run B found the parser earlier</td>
+          </tr>
+          <tr>
+            <td>User corrections</td>
+            <td class="mono">3</td>
+            <td class="mono">1</td>
+            <td>Fewer framing mistakes</td>
+          </tr>
+          <tr>
+            <td>Verification depth</td>
+            <td class="mono">lint only</td>
+            <td class="mono">lint + tests</td>
+            <td>Better final proof</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="footer-note">
+    SuperView design preview. Source of truth: DESIGN.md.
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const toggle = document.getElementById("themeToggle");
+
+    function setTheme(theme) {
+      root.dataset.theme = theme;
+      toggle.textContent = theme === "dark" ? "Bright theme" : "Dark theme";
+      try {
+        localStorage.setItem("superview-theme", theme);
+      } catch (_) {}
+    }
+
+    try {
+      const savedTheme = localStorage.getItem("superview-theme");
+      if (savedTheme === "dark" || savedTheme === "light") {
+        setTheme(savedTheme);
+      } else {
+        setTheme(root.dataset.theme || "light");
+      }
+    } catch (_) {
+      setTheme(root.dataset.theme || "light");
+    }
+
+    toggle.addEventListener("click", () => {
+      setTheme(root.dataset.theme === "dark" ? "light" : "dark");
+    });
+
+    const playRun = document.getElementById("playRun");
+    const agentSprite = document.getElementById("agentSprite");
+    const replayFill = document.getElementById("replayFill");
+    const replayNote = document.getElementById("replayNote");
+    const beltSteps = Array.from(document.querySelectorAll("[data-belt-step]"));
+
+    const frames = [
+      { left: "8%", top: "148px", note: "spawn: read task", state: "", progress: 8, belt: 0 },
+      { left: "24%", top: "128px", note: "collect context coins", state: "", progress: 24, belt: 0 },
+      { left: "39%", top: "104px", note: "hit question block", state: "boost", progress: 40, belt: 1 },
+      { left: "48%", top: "118px", note: "mushroom patch boost", state: "boost", progress: 52, belt: 2 },
+      { left: "64%", top: "160px", note: "test pit: failure", state: "hit", progress: 68, belt: 3 },
+      { left: "77%", top: "126px", note: "pipe reroute", state: "", progress: 82, belt: 3 },
+      { left: "88%", top: "112px", note: "finish flag missing proof", state: "clear", progress: 96, belt: 4 }
+    ];
+
+    let frameIndex = 0;
+    let runTimer = null;
+
+    function applyFrame(index) {
+      const frame = frames[index];
+      agentSprite.style.left = frame.left;
+      agentSprite.style.top = frame.top;
+      agentSprite.classList.remove("hit", "boost", "clear");
+      if (frame.state) agentSprite.classList.add(frame.state);
+      replayFill.style.width = `${frame.progress}%`;
+      replayNote.textContent = frame.note;
+      beltSteps.forEach((step, stepIndex) => {
+        step.classList.toggle("done", stepIndex <= frame.belt);
+      });
+    }
+
+    function resetRun() {
+      frameIndex = 0;
+      applyFrame(frameIndex);
+      playRun.textContent = "Play run";
+    }
+
+    function playSequence() {
+      clearInterval(runTimer);
+      playRun.textContent = "Replay";
+      applyFrame(frameIndex);
+      runTimer = setInterval(() => {
+        frameIndex += 1;
+        if (frameIndex >= frames.length) {
+          clearInterval(runTimer);
+          frameIndex = 0;
+          playRun.textContent = "Replay run";
+          return;
+        }
+        applyFrame(frameIndex);
+      }, 760);
+    }
+
+    playRun.addEventListener("click", playSequence);
+    resetRun();
+  </script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SuperView MVP Implementation Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #fcfaf7;
+      --surface: #ffffff;
+      --surface-soft: #f3f4f6;
+      --ink: #423d38;
+      --muted: #797067;
+      --line: #e3e0dd;
+      --line-strong: #d1d5dc;
+      --orange: #fe6e00;
+      --orange-strong: #ff6b00;
+      --shell: rgba(0, 0, 0, .72);
+      --on-shell: #ffffff;
+      --shadow: 0 12px 28px rgba(0, 0, 0, .10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(227, 224, 221, .45) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(227, 224, 221, .35) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      line-height: 1.55;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px 28px;
+      background: var(--shell);
+      color: var(--on-shell);
+      border-bottom: 1px solid rgba(255, 255, 255, .12);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: grid;
+      gap: 4px;
+    }
+
+    .brand strong {
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .brand span {
+      color: rgba(255, 255, 255, .72);
+      font-size: 13px;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 36px 28px 64px;
+    }
+
+    .hero {
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      color: var(--orange);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 10px 0 14px;
+      font-size: clamp(36px, 7vw, 72px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 860px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    section {
+      margin: 18px 0;
+      padding: 22px 24px;
+      background: rgba(255, 255, 255, .82);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 22px;
+    }
+
+    ul {
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+    }
+
+    code {
+      color: #9f3a00;
+      background: #fff1e5;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    pre {
+      overflow-x: auto;
+      padding: 14px;
+      border-radius: 8px;
+      background: #24201c;
+      color: #fff7ed;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--orange);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <strong>SuperView</strong>
+      <span>Codex log timeline and agent run replay</span>
+    </div>
+    <span class="badge">MVP Phase 1</span>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="eyebrow">Implementation Plan</div>
+      <h1>SuperView MVP</h1>
+      <p class="lead">A local-first dashboard that turns Codex rollout JSONL into a project timeline, with replayable side-scrolling drill-downs for individual agent runs.</p>
+    </div>
+
+    <section>
+      <h2>1. Product Goal</h2>
+      <p>SuperView is a local-first Codex log visualization dashboard for complex engineering work. The MVP turns Codex rollout JSONL files into a project timeline, then lets users drill into a single Codex run as a replayable side-scrolling level.</p>
+      <p>The memorable outcome is: "wow, I have never seen a coding agent from this angle."</p>
+    </section>
+
+    <section>
+      <h2>2. MVP Scope</h2>
+      <ul>
+        <li>Scan real <code>~/.codex/sessions/**/*.jsonl</code> files.</li>
+        <li>Parse and normalize Codex session events.</li>
+        <li>Store redacted evidence in local SQLite.</li>
+        <li>Build project timelines with Product, Architecture, Code, Agent Runs, Verification, and Risks lanes.</li>
+        <li>Open a run replay view with level-like nodes for prompts, tool calls, patches, failures, and verification.</li>
+        <li>Support Bright and Dark Command Center themes.</li>
+      </ul>
+      <p>Out of scope: cloud upload, accounts, teams, watcher, LLM summaries, Pattern Codex, badges, desktop shell, and <code>codex-tui.log</code>.</p>
+    </section>
+
+    <section>
+      <h2>3. Architecture</h2>
+      <pre>React UI
+  -&gt; HTTP API now, desktop IPC later
+    -&gt; runtime-node
+      -&gt; core services
+      -&gt; storage
+      -&gt; local filesystem and git</pre>
+      <p>The UI must never import <code>fs</code>, <code>path</code>, <code>child_process</code>, or SQLite modules. All local capabilities go through API now and desktop IPC later.</p>
+    </section>
+
+    <section>
+      <h2>4. Codex Log Integration</h2>
+      <ul>
+        <li>Primary source: <code>~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl</code>.</li>
+        <li>Supporting source: <code>~/.codex/history.jsonl</code>.</li>
+        <li>Ignored for MVP: <code>~/.codex/log/codex-tui.log</code>.</li>
+        <li>Store redacted payloads, source path, line number, and SHA-256.</li>
+        <li>Reasoning records become markers only; encrypted contents are not displayed.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Data Model</h2>
+      <p>Development SQLite path: <code>.superview/superview.sqlite</code>. Desktop builds should move this to the platform application data directory.</p>
+      <pre>schema_meta
+projects
+sessions
+turns
+raw_event_refs
+events
+episodes
+artifacts
+ingest_jobs</pre>
+    </section>
+
+    <section>
+      <h2>6. Timeline and Replay</h2>
+      <p>Timeline lanes are Product, Architecture, Code, Agent Runs, Verification, and Risks. Episodes are deterministic and labeled <code>Auto grouped</code>.</p>
+      <p>Replay maps user prompts to start gates, file reads to context blocks, tool calls to platforms, patches to power-ups, failed commands to hazards, and verification success to finish flags.</p>
+    </section>
+
+    <section>
+      <h2>7. Frontend Experience</h2>
+      <p>The first screen is the dashboard: Run Ledger on the left, Project Timeline in the center, Evidence Drawer on the right, and replay detail for selected runs. The visual system follows <code>DESIGN.md</code>: warm off-white workspace, dark frosted shell, orange telemetry, and compact dashboard density.</p>
+    </section>
+
+    <section>
+      <h2>8. Desktop App Considerations</h2>
+      <ul>
+        <li>Keep React browser-only.</li>
+        <li>Keep parser, redactor, timeline, and replay logic in pure TypeScript modules.</li>
+        <li>Centralize data directory resolution.</li>
+        <li>Add <code>schema_meta(version)</code> from day one.</li>
+        <li>Make Codex home configurable with <code>SUPERVIEW_CODEX_HOME</code>.</li>
+        <li>Use job-based ingest so desktop windows do not freeze.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>9. Test Plan</h2>
+      <p>Use fixture rollout files for parser, normalizer, redactor, timeline, and replay tests. Integration tests cover ingest jobs and APIs. E2E tests cover empty state, scan, timeline, replay controls, evidence drawer, and theme switching.</p>
+    </section>
+
+    <section>
+      <h2>10. Acceptance Criteria</h2>
+      <ul>
+        <li><code>pnpm dev</code> starts the dashboard.</li>
+        <li>Scan reads real Codex rollout JSONL files.</li>
+        <li>Timeline and replay views show redacted Codex evidence.</li>
+        <li>Non-git directories do not break ingest.</li>
+        <li>Desktop migration can reuse <code>core/</code> and <code>storage/</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>11. Assumptions</h2>
+      <p><code>DESIGN.md</code> is the source of truth. Phase 1 is local-only and deterministic. Raw Codex logs stay on the user's machine. Desktop packaging starts only after parser, timeline, replay, and evidence UX are stable.</p>
+    </section>
+  </main>
+</body>
+</html>
