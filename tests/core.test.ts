@@ -51,6 +51,38 @@ describe("Codex parser and normalizer", () => {
     expect(nodes.some((node) => node.type === "hazard")).toBe(true);
   });
 
+  it("extracts token usage from response items and aggregates project totals", () => {
+    const lines = parseCodexJsonlContent(fixture("token-usage-rollout.jsonl"), "token-usage-rollout.jsonl");
+    const bundle = normalizeCodexLines(lines, { repoRoot: "/tmp/superview-fixture" });
+    expect(bundle).toBeTruthy();
+
+    const assistant = bundle!.events.find((event) => event.kind === "assistant_message");
+    const reasoning = bundle!.events.find((event) => event.kind === "reasoning_marker");
+    const timeline = buildProjectTimeline(bundle!.project, bundle!.events);
+
+    expect(assistant?.tokenUsage).toEqual({
+      input: 120,
+      output: 30,
+      reasoning: 10,
+      cachedInput: 40,
+      total: 160
+    });
+    expect(reasoning?.tokenUsage).toEqual({
+      input: 5,
+      output: 7,
+      reasoning: 0,
+      cachedInput: 2,
+      total: 20
+    });
+    expect(timeline.tokenUsage).toEqual({
+      input: 125,
+      output: 37,
+      reasoning: 10,
+      cachedInput: 42,
+      total: 180
+    });
+  });
+
   it("builds task journeys from each user prompt boundary", () => {
     const lines = parseCodexJsonlContent(fixture("call-association-rollout.jsonl"), "call-association-rollout.jsonl");
     const bundle = normalizeCodexLines(lines, { repoRoot: "/tmp/superview-fixture" });

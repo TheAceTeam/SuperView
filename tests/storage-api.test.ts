@@ -148,6 +148,51 @@ describe("SuperView API", () => {
       rmSync(gitCodexHome, { recursive: true, force: true });
     }
   });
+
+  it("persists token usage and returns project totals from the API timeline", async () => {
+    const tokenCodexHome = mkdtempSync(path.join(tmpdir(), "superview-token-codex-home-"));
+    try {
+      mkdirSync(path.join(tokenCodexHome, "sessions", "2026", "05", "25"), { recursive: true });
+      writeFileSync(
+        path.join(tokenCodexHome, "sessions", "2026", "05", "25", "rollout-token.jsonl"),
+        [
+          JSON.stringify({ timestamp: "2026-05-25T05:00:00.000Z", type: "session_meta", payload: { id: "token-session", timestamp: "2026-05-25T05:00:00.000Z", cwd: "/tmp/superview-token", cli_version: "0.125.0", model_provider: "OpenAI", source: "cli" } }),
+          JSON.stringify({ timestamp: "2026-05-25T05:00:01.000Z", type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "usage captured" }], usage: { input_tokens: 120, output_tokens: 30, output_tokens_details: { reasoning_tokens: 10 }, input_tokens_details: { cached_tokens: 40 } } } })
+        ].join("\n")
+      );
+
+      const app = createServer();
+      const job = await runIngest(app, tokenCodexHome);
+      expect(job.status).toBe("completed");
+
+      const projects = await request(app).get("/api/projects");
+      const projectId = projects.body.projects.find((project: { name: string }) => project.name === "superview-token").id;
+      const timeline = await request(app).get(`/api/projects/${projectId}/timeline`).query({ limit: 20 });
+      expect(timeline.body.tokenUsage).toEqual({
+        input: 120,
+        output: 30,
+        reasoning: 10,
+        cachedInput: 40,
+        total: 160
+      });
+      expect(timeline.body.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            kind: "assistant_message",
+            tokenUsage: {
+              input: 120,
+              output: 30,
+              reasoning: 10,
+              cachedInput: 40,
+              total: 160
+            }
+          })
+        ])
+      );
+    } finally {
+      rmSync(tokenCodexHome, { recursive: true, force: true });
+    }
+  });
 });
 
 async function runIngest(app: express.Express, sourceCodexHome: string) {

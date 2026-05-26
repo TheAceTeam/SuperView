@@ -14,6 +14,7 @@ import {
   RunReplay,
   SessionRecord,
   TaskJourneyDetail,
+  TokenUsage,
   TimelineQuery,
   TimelineEvent,
   TurnRecord
@@ -23,6 +24,11 @@ import { buildReplayNodes } from "../core/replay";
 import { resolveDatabasePath } from "./paths";
 
 const SCHEMA_VERSION = 1;
+
+type EventRow = Omit<TimelineEvent, "files" | "tokenUsage"> & {
+  filesJson: string;
+  tokenUsageJson: string | null;
+};
 
 export class SuperViewDatabase {
   private db: Database.Database;
@@ -110,6 +116,7 @@ export class SuperViewDatabase {
         duration_ms INTEGER,
         output_event_id TEXT,
         commit_hash TEXT,
+        token_usage_json TEXT,
         FOREIGN KEY(project_id) REFERENCES projects(id),
         FOREIGN KEY(session_id) REFERENCES sessions(id)
       );
@@ -188,6 +195,7 @@ export class SuperViewDatabase {
     this.ensureColumn("events", "duration_ms", "INTEGER");
     this.ensureColumn("events", "output_event_id", "TEXT");
     this.ensureColumn("events", "commit_hash", "TEXT");
+    this.ensureColumn("events", "token_usage_json", "TEXT");
     this.db.prepare("INSERT OR REPLACE INTO schema_meta(version, updated_at) VALUES (?, ?)").run(SCHEMA_VERSION, new Date().toISOString());
   }
 
@@ -272,10 +280,17 @@ export class SuperViewDatabase {
   upsertEvent(event: TimelineEvent) {
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO events(id, project_id, session_id, turn_id, timestamp, kind, lane, title, detail, tool_name, call_id, status, files_json, raw_event_ref_id, duration_ms, output_event_id, commit_hash)
-         VALUES (@id, @projectId, @sessionId, @turnId, @timestamp, @kind, @lane, @title, @detail, @toolName, @callId, @status, @filesJson, @rawEventRefId, @durationMs, @outputEventId, @commitHash)`
+        `INSERT OR REPLACE INTO events(id, project_id, session_id, turn_id, timestamp, kind, lane, title, detail, tool_name, call_id, status, files_json, raw_event_ref_id, duration_ms, output_event_id, commit_hash, token_usage_json)
+         VALUES (@id, @projectId, @sessionId, @turnId, @timestamp, @kind, @lane, @title, @detail, @toolName, @callId, @status, @filesJson, @rawEventRefId, @durationMs, @outputEventId, @commitHash, @tokenUsageJson)`
       )
-      .run({ ...event, filesJson: JSON.stringify(event.files), durationMs: event.durationMs ?? null, outputEventId: event.outputEventId ?? null, commitHash: event.commitHash ?? null });
+      .run({
+        ...event,
+        filesJson: JSON.stringify(event.files),
+        durationMs: event.durationMs ?? null,
+        outputEventId: event.outputEventId ?? null,
+        commitHash: event.commitHash ?? null,
+        tokenUsageJson: event.tokenUsage ? JSON.stringify(event.tokenUsage) : null
+      });
   }
 
   upsertHistoryPrompt(prompt: CodexHistoryPrompt) {
@@ -411,11 +426,11 @@ export class SuperViewDatabase {
       .prepare(
         `SELECT id, project_id as projectId, session_id as sessionId, turn_id as turnId, timestamp, kind, lane, title, detail,
                 tool_name as toolName, call_id as callId, status, files_json as filesJson, raw_event_ref_id as rawEventRefId,
-                duration_ms as durationMs, output_event_id as outputEventId, commit_hash as commitHash
+                duration_ms as durationMs, output_event_id as outputEventId, commit_hash as commitHash, token_usage_json as tokenUsageJson
          FROM events ${where} ORDER BY timestamp ASC${pagination}`
       )
-      .all(...params, ...paginationParams) as Array<Omit<TimelineEvent, "files"> & { filesJson: string }>;
-    return rows.map((row) => ({ ...row, files: JSON.parse(row.filesJson) as string[] }));
+      .all(...params, ...paginationParams) as EventRow[];
+    return rows.map(rowToTimelineEvent);
   }
 
   countEvents(projectId: string, query: TimelineQuery = {}): number {
@@ -432,10 +447,25 @@ export class SuperViewDatabase {
     return {
       ...timeline,
       episodes: this.listEpisodes(projectId),
+      tokenUsage: this.getProjectTokenUsage(projectId),
       totalEvents: this.countEvents(projectId, query),
       limit: normalizeLimit(query.limit),
       offset: Math.max(0, Math.trunc(query.offset ?? 0))
     };
+  }
+
+  getProjectTokenUsage(projectId: string): TokenUsage {
+    const rows = this.db.prepare("SELECT token_usage_json as tokenUsageJson FROM events WHERE project_id = ? AND token_usage_json IS NOT NULL").all(projectId) as Array<{ tokenUsageJson: string | null }>;
+    return rows.reduce<TokenUsage>((total, row) => {
+      const usage = parseTokenUsage(row.tokenUsageJson);
+      return {
+        input: total.input + (usage?.input ?? 0),
+        output: total.output + (usage?.output ?? 0),
+        reasoning: total.reasoning + (usage?.reasoning ?? 0),
+        cachedInput: total.cachedInput + (usage?.cachedInput ?? 0),
+        total: total.total + (usage?.total ?? 0)
+      };
+    }, { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 });
   }
 
   getTaskJourneyDetail(journeyId: string, projectId?: string): TaskJourneyDetail | null {
@@ -530,11 +560,11 @@ export class SuperViewDatabase {
       .prepare(
         `SELECT id, project_id as projectId, session_id as sessionId, turn_id as turnId, timestamp, kind, lane, title, detail,
                 tool_name as toolName, call_id as callId, status, files_json as filesJson, raw_event_ref_id as rawEventRefId,
-                duration_ms as durationMs, output_event_id as outputEventId, commit_hash as commitHash
+                duration_ms as durationMs, output_event_id as outputEventId, commit_hash as commitHash, token_usage_json as tokenUsageJson
          FROM events WHERE project_id = ? AND session_id = ? ORDER BY timestamp ASC`
       )
-      .all(projectId, sessionId) as Array<Omit<TimelineEvent, "files"> & { filesJson: string }>;
-    return rows.map((row) => ({ ...row, files: JSON.parse(row.filesJson) as string[] }));
+      .all(projectId, sessionId) as EventRow[];
+    return rows.map(rowToTimelineEvent);
   }
 
   getEvent(eventId: string): TimelineEvent | null {
@@ -542,11 +572,11 @@ export class SuperViewDatabase {
       .prepare(
         `SELECT id, project_id as projectId, session_id as sessionId, turn_id as turnId, timestamp, kind, lane, title, detail,
                 tool_name as toolName, call_id as callId, status, files_json as filesJson, raw_event_ref_id as rawEventRefId,
-                duration_ms as durationMs, output_event_id as outputEventId, commit_hash as commitHash
+                duration_ms as durationMs, output_event_id as outputEventId, commit_hash as commitHash, token_usage_json as tokenUsageJson
          FROM events WHERE id = ?`
       )
-      .get(eventId) as (Omit<TimelineEvent, "files"> & { filesJson: string }) | undefined;
-    return row ? { ...row, files: JSON.parse(row.filesJson) as string[] } : null;
+      .get(eventId) as EventRow | undefined;
+    return row ? rowToTimelineEvent(row) : null;
   }
 
   getRawEvent(rawEventRefId: string): RawEventRef | null {
@@ -586,4 +616,29 @@ export class SuperViewDatabase {
 function normalizeLimit(limit: number | undefined): number {
   if (limit === undefined) return 200;
   return Math.min(500, Math.max(1, Math.trunc(limit)));
+}
+
+function rowToTimelineEvent(row: EventRow): TimelineEvent {
+  const { filesJson, tokenUsageJson, ...event } = row;
+  return {
+    ...event,
+    files: JSON.parse(filesJson) as string[],
+    tokenUsage: parseTokenUsage(tokenUsageJson)
+  };
+}
+
+function parseTokenUsage(value: string | null): TokenUsage | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<TokenUsage>;
+    return {
+      input: Number(parsed.input ?? 0),
+      output: Number(parsed.output ?? 0),
+      reasoning: Number(parsed.reasoning ?? 0),
+      cachedInput: Number(parsed.cachedInput ?? 0),
+      total: Number(parsed.total ?? 0)
+    };
+  } catch {
+    return null;
+  }
 }

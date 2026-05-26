@@ -8,6 +8,7 @@ import {
   SessionRecord,
   TimelineEvent,
   TimelineLane,
+  TokenUsage,
   TurnRecord
 } from "./types";
 import { safeExcerpt } from "./redactor";
@@ -142,16 +143,17 @@ function normalizeResponseItem(input: {
   const { line, rawRef, projectId, sessionId, turnId, payload, rawPayload } = input;
   const payloadType = stringValue(payload.type) ?? stringValue(rawPayload.type);
   const role = stringValue(payload.role) ?? stringValue(rawPayload.role);
+  const tokenUsage = extractTokenUsage(rawPayload);
 
   if (payloadType === "message") {
     const text = extractMessageText(payload);
     if (role === "user") {
-      return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "user_prompt", lane: "Product", title: summarize(text, "User prompt"), detail: text, status: "success" });
+      return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "user_prompt", lane: "Product", title: summarize(text, "User prompt"), detail: text, status: "success", tokenUsage });
     }
     if (role === "assistant") {
-      return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "assistant_message", lane: "Agent Runs", title: summarize(text, "Assistant message"), detail: text, status: "success" });
+      return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "assistant_message", lane: "Agent Runs", title: summarize(text, "Assistant message"), detail: text, status: "success", tokenUsage });
     }
-    return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "status", lane: "Agent Runs", title: `${role ?? "System"} message`, detail: text, status: "success" });
+    return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "status", lane: "Agent Runs", title: `${role ?? "System"} message`, detail: text, status: "success", tokenUsage });
   }
 
   if (payloadType === "function_call") {
@@ -172,7 +174,8 @@ function normalizeResponseItem(input: {
       toolName,
       callId: stringValue(payload.call_id) ?? stringValue(rawPayload.call_id),
       status: "running",
-      files: extractFiles(payload)
+      files: extractFiles(payload),
+      tokenUsage
     });
   }
 
@@ -192,15 +195,16 @@ function normalizeResponseItem(input: {
       detail: safeExcerpt(output, 1200),
       callId: stringValue(payload.call_id) ?? stringValue(rawPayload.call_id),
       status: failed ? "failed" : "success",
-      files: extractFiles(payload)
+      files: extractFiles(payload),
+      tokenUsage
     });
   }
 
   if (payloadType === "reasoning") {
-    return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "reasoning_marker", lane: "Agent Runs", title: "Reasoning segment", detail: "Reasoning content is not displayed.", status: "success" });
+    return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "reasoning_marker", lane: "Agent Runs", title: "Reasoning segment", detail: "Reasoning content is not displayed.", status: "success", tokenUsage });
   }
 
-  return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "status", lane: "Agent Runs", title: payloadType ?? "Response item", detail: safeExcerpt(payload, 900) });
+  return makeEvent({ line, rawRef, projectId, sessionId, turnId, kind: "status", lane: "Agent Runs", title: payloadType ?? "Response item", detail: safeExcerpt(payload, 900), tokenUsage });
 }
 
 function normalizeEventMessage(input: {
@@ -245,6 +249,7 @@ function makeEvent(input: {
   files?: string[];
   durationMs?: number | null;
   outputEventId?: string | null;
+  tokenUsage?: TokenUsage | null;
 }): TimelineEvent {
   return {
     id: stableId("event", input.sessionId, input.line.lineNo, input.kind, input.title),
@@ -262,7 +267,8 @@ function makeEvent(input: {
     files: input.files ?? [],
     rawEventRefId: input.rawRef.id,
     durationMs: input.durationMs ?? null,
-    outputEventId: input.outputEventId ?? null
+    outputEventId: input.outputEventId ?? null,
+    tokenUsage: input.tokenUsage ?? null
   };
 }
 
@@ -382,6 +388,101 @@ function summarize(text: string | null | undefined, fallback: string): string {
   const clean = (text ?? "").replace(/\s+/g, " ").trim();
   if (!clean) return fallback;
   return clean.length > 88 ? `${clean.slice(0, 85)}...` : clean;
+}
+
+function extractTokenUsage(payload: Record<string, unknown>): TokenUsage | null {
+  const usageContainers = collectUsageContainers(payload);
+  if (usageContainers.length === 0) return null;
+
+  const input = firstNumber(usageContainers, ["input_tokens", "prompt_tokens", "input", "prompt"]);
+  const output = firstNumber(usageContainers, ["output_tokens", "completion_tokens", "output", "completion"]);
+  const reasoning = firstNumber(usageContainers, ["reasoning_tokens", "reasoning"]);
+  const cachedInput = firstNumber(usageContainers, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input"]);
+  const explicitTotal = firstNumber(usageContainers, ["total_tokens", "total"]);
+  const knownSum = sumNumbers(input, output, reasoning);
+  const total = explicitTotal ?? knownSum;
+
+  if (input === null && output === null && reasoning === null && cachedInput === null && total === null) {
+    return null;
+  }
+
+  return {
+    input: input ?? 0,
+    output: output ?? 0,
+    reasoning: reasoning ?? 0,
+    cachedInput: cachedInput ?? 0,
+    total: total ?? 0
+  };
+}
+
+function collectUsageContainers(payload: Record<string, unknown>): unknown[] {
+  const containers: unknown[] = [];
+  for (const [key, value] of Object.entries(payload)) {
+    const normalized = normalizeTokenKey(key);
+    if ((normalized.includes("usage") || normalized.includes("tokens") || normalized.endsWith("details")) && value && typeof value === "object") {
+      containers.push(value);
+      containers.push(...collectNestedUsageContainers(value));
+    }
+  }
+  return containers;
+}
+
+function collectNestedUsageContainers(value: unknown): unknown[] {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) return value.flatMap(collectNestedUsageContainers);
+
+  const containers: unknown[] = [];
+  for (const [key, child] of Object.entries(value)) {
+    const normalized = normalizeTokenKey(key);
+    if ((normalized.includes("usage") || normalized.includes("tokens") || normalized.endsWith("details")) && child && typeof child === "object") {
+      containers.push(child);
+    }
+    containers.push(...collectNestedUsageContainers(child));
+  }
+  return containers;
+}
+
+function firstNumber(value: unknown, keys: string[]): number | null {
+  const matches = collectTokenNumbers(value, new Set(keys.map(normalizeTokenKey)));
+  return matches[0] ?? null;
+}
+
+function collectTokenNumbers(value: unknown, keys: Set<string>): number[] {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectTokenNumbers(item, keys));
+  }
+
+  const matches: number[] = [];
+  for (const [key, child] of Object.entries(value)) {
+    const numeric = numberValue(child);
+    if (numeric !== null && keys.has(normalizeTokenKey(key))) {
+      matches.push(numeric);
+    }
+    if (child && typeof child === "object") {
+      matches.push(...collectTokenNumbers(child, keys));
+    }
+  }
+  return matches;
+}
+
+function normalizeTokenKey(key: string): string {
+  return key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+function numberValue(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return Math.trunc(value);
+  }
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    return Number(value);
+  }
+  return null;
+}
+
+function sumNumbers(...values: Array<number | null>): number | null {
+  const known = values.filter((value): value is number => value !== null);
+  return known.length > 0 ? known.reduce((sum, value) => sum + value, 0) : null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

@@ -98,6 +98,14 @@ export interface RawEventRef {
   sha256: string;
 }
 
+export interface TokenUsage {
+  input: number;
+  output: number;
+  reasoning: number;
+  cachedInput: number;
+  total: number;
+}
+
 export interface TimelineEvent {
   id: string;
   projectId: string;
@@ -116,6 +124,7 @@ export interface TimelineEvent {
   durationMs?: number | null;
   outputEventId?: string | null;
   commitHash?: string | null;
+  tokenUsage?: TokenUsage | null;
 }
 
 export interface Episode {
@@ -226,6 +235,7 @@ export interface ProjectTimeline {
   events: TimelineEvent[];
   causalEdges: CausalEdge[];
   taskJourneys: TaskJourney[];
+  tokenUsage: TokenUsage;
   totalEvents?: number;
   limit?: number;
   offset?: number;

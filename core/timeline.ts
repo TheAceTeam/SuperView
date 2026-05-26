@@ -1,5 +1,5 @@
 import { addMinutes, differenceInMinutes, isValid, parseISO } from "date-fns";
-import { CausalConfidence, CausalEdge, CausalEdgeType, Episode, EventStatus, ProjectRecord, ProjectTimeline, TaskJourney, TaskJourneyStage, TimelineEvent, TimelineLane } from "./types";
+import { CausalConfidence, CausalEdge, CausalEdgeType, Episode, EventStatus, ProjectRecord, ProjectTimeline, TaskJourney, TaskJourneyStage, TimelineEvent, TimelineLane, TokenUsage } from "./types";
 import { stableId } from "./id";
 
 const EPISODE_GAP_MINUTES = 90;
@@ -12,8 +12,24 @@ export function buildProjectTimeline(project: ProjectRecord, events: TimelineEve
     events: sortedEvents,
     episodes: groupEpisodes(project.id, sortedEvents),
     causalEdges: buildCausalEdges(project.id, sortedEvents),
-    taskJourneys: buildTaskJourneys(project.id, sortedEvents)
+    taskJourneys: buildTaskJourneys(project.id, sortedEvents),
+    tokenUsage: aggregateTokenUsage(project.id, sortedEvents)
   };
+}
+
+export function aggregateTokenUsage(projectId: string, events: TimelineEvent[]): TokenUsage {
+  return events
+    .filter((event) => event.projectId === projectId)
+    .reduce<TokenUsage>(
+      (total, event) => ({
+        input: total.input + (event.tokenUsage?.input ?? 0),
+        output: total.output + (event.tokenUsage?.output ?? 0),
+        reasoning: total.reasoning + (event.tokenUsage?.reasoning ?? 0),
+        cachedInput: total.cachedInput + (event.tokenUsage?.cachedInput ?? 0),
+        total: total.total + (event.tokenUsage?.total ?? 0)
+      }),
+      { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 }
+    );
 }
 
 export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): TaskJourney[] {
