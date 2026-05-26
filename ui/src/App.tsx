@@ -1,13 +1,11 @@
 import { AlertTriangle, FileText, GitBranch, Moon, RotateCw, Search, Sun } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, TaskJourney, TaskJourneyDetail, TimelineEvent } from "../../core/types";
 import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
 
 const TIMELINE_LIMIT = 300;
-const PRELOAD_JOURNEY_DETAILS = 3;
-
 export function App() {
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("superview-theme") as Theme | null) ?? "light");
   const [projects, setProjects] = useState<ProjectWithSessions[]>([]);
@@ -19,6 +17,7 @@ export function App() {
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [journeyDetails, setJourneyDetails] = useState<Record<string, TaskJourneyDetail>>({});
   const [journeyLoadingIds, setJourneyLoadingIds] = useState<Record<string, boolean>>({});
+  const journeyLoadingRef = useRef(new Set<string>());
   const [expandedJourneyIds, setExpandedJourneyIds] = useState<Record<string, boolean>>({});
   const [eventEvidence, setEventEvidence] = useState<EventEvidence | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
@@ -45,9 +44,6 @@ export function App() {
   useEffect(() => {
     if (!timeline || timeline.taskJourneys.length === 0) return;
     setSelectedJourneyId((current) => current ?? timeline.taskJourneys[0]?.id ?? null);
-    for (const journey of timeline.taskJourneys.slice(0, PRELOAD_JOURNEY_DETAILS)) {
-      void loadJourneyDetail(journey.id);
-    }
   }, [timeline]);
 
   useEffect(() => {
@@ -141,23 +137,24 @@ export function App() {
     setJob(await fetchIngestJob(jobId));
   }
 
-  async function loadJourneyDetail(journeyId: string) {
-    if (journeyDetails[journeyId] || journeyLoadingIds[journeyId]) return;
+  async function loadJourneyDetail(journeyId: string, projectId = selectedProjectId ?? undefined) {
+    if (journeyDetails[journeyId] || journeyLoadingRef.current.has(journeyId)) return;
+    journeyLoadingRef.current.add(journeyId);
     setJourneyLoadingIds((current) => ({ ...current, [journeyId]: true }));
     try {
-      const detail = await fetchTaskJourneyDetail(journeyId);
+      const detail = await fetchTaskJourneyDetail(journeyId, projectId);
       setJourneyDetails((current) => ({ ...current, [journeyId]: detail }));
       setError(null);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError));
     } finally {
+      journeyLoadingRef.current.delete(journeyId);
       setJourneyLoadingIds((current) => ({ ...current, [journeyId]: false }));
     }
   }
 
   function selectJourney(journeyId: string) {
     setSelectedJourneyId(journeyId);
-    void loadJourneyDetail(journeyId);
     const summary = timeline?.taskJourneys.find((journey) => journey.id === journeyId);
     const promptEvent = summary ? timelineEventsById.get(summary.promptEventId) : null;
     if (promptEvent) {

@@ -3,6 +3,7 @@ import { CausalConfidence, CausalEdge, CausalEdgeType, Episode, EventStatus, Pro
 import { stableId } from "./id";
 
 const EPISODE_GAP_MINUTES = 90;
+const LANE_ORDER: TimelineLane[] = ["Product", "Architecture", "Code", "Agent Runs", "Verification", "Risks"];
 
 export function buildProjectTimeline(project: ProjectRecord, events: TimelineEvent[]): ProjectTimeline {
   const sortedEvents = [...events].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
@@ -16,16 +17,15 @@ export function buildProjectTimeline(project: ProjectRecord, events: TimelineEve
 }
 
 export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): TaskJourney[] {
-  const projectEvents = events
-    .filter((event) => event.projectId === projectId)
-    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const projectEvents = events.filter((event) => event.projectId === projectId);
   const promptIndexes = projectEvents
     .map((event, index) => ({ event, index }))
     .filter(({ event }) => event.kind === "user_prompt");
 
   return promptIndexes.map(({ event: prompt, index }, promptIndex) => {
+    const nextPromptIndex = promptIndexes[promptIndex + 1]?.index ?? projectEvents.length;
     const nextPrompt = promptIndexes[promptIndex + 1]?.event;
-    const endIndex = nextPrompt ? projectEvents.findIndex((event) => event.id === nextPrompt.id) : projectEvents.length;
+    const endIndex = nextPromptIndex;
     const journeyEvents = projectEvents.slice(index, endIndex);
     const end = journeyEvents.at(-1) ?? prompt;
     const stages = buildTaskJourneyStages(journeyEvents);
@@ -56,32 +56,35 @@ export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): T
 }
 
 function buildTaskJourneyStages(events: TimelineEvent[]): TaskJourneyStage[] {
-  const laneOrder: TimelineLane[] = ["Product", "Architecture", "Code", "Agent Runs", "Verification", "Risks"];
-  return laneOrder.flatMap((lane) => {
-    const laneEvents = events.filter((event) => event.lane === lane);
-    if (laneEvents.length === 0) return [];
-    const failures = laneEvents.filter((event) => event.status === "failed").length;
-    const successes = laneEvents.filter((event) => event.status === "success").length;
-    const status: EventStatus = failures > 0 ? "failed" : successes > 0 ? "success" : "unknown";
-    const first = laneEvents[0];
-    const last = laneEvents.at(-1) ?? first;
-    return [
+  const byLane = new Map<TimelineLane, { lane: TimelineLane; eventIds: string[]; firstEventId: string; lastEventId: string; failures: number; successes: number }>();
+  for (const event of events) {
+    const current =
+      byLane.get(event.lane) ??
       {
-        lane,
-        count: laneEvents.length,
-        status,
-        firstEventId: first.id,
-        lastEventId: last.id,
-        eventIds: laneEvents.map((event) => event.id)
-      }
-    ];
+        lane: event.lane,
+        eventIds: [],
+        firstEventId: event.id,
+        lastEventId: event.id,
+        failures: 0,
+        successes: 0
+      };
+    current.eventIds.push(event.id);
+    current.lastEventId = event.id;
+    if (event.status === "failed") current.failures += 1;
+    if (event.status === "success") current.successes += 1;
+    byLane.set(event.lane, current);
+  }
+
+  return LANE_ORDER.flatMap((lane) => {
+    const stage = byLane.get(lane);
+    if (!stage) return [];
+    const status: EventStatus = stage.failures > 0 ? "failed" : stage.successes > 0 ? "success" : "unknown";
+    return [{ lane, count: stage.eventIds.length, status, firstEventId: stage.firstEventId, lastEventId: stage.lastEventId, eventIds: stage.eventIds }];
   });
 }
 
 export function buildCausalEdges(projectId: string, events: TimelineEvent[]): CausalEdge[] {
-  const sortedEvents = events
-    .filter((event) => event.projectId === projectId)
-    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const sortedEvents = events.filter((event) => event.projectId === projectId);
   const byId = new Map(sortedEvents.map((event) => [event.id, event]));
   const edges = new Map<string, CausalEdge>();
 
@@ -123,68 +126,105 @@ export function buildCausalEdges(projectId: string, events: TimelineEvent[]): Ca
     }
   }
 
-  for (const prompt of sortedEvents.filter((event) => event.kind === "user_prompt")) {
-    const afterPrompt = sortedEvents.filter((event) => isAfter(event, prompt) && event.sessionId === prompt.sessionId);
-    addEdge(
-      prompt,
-      afterPrompt.find((event) => event.lane === "Architecture" && (event.kind === "file_change" || event.kind === "tool_call")),
-      "updates_design",
-      "inferred",
-      "First architecture or design artifact after this prompt in the same session.",
-      prompt.title
-    );
-    addEdge(
-      prompt,
-      afterPrompt.find((event) => event.lane === "Code" && (event.kind === "file_change" || event.toolName === "git")),
-      "implements_prompt",
-      "inferred",
-      "First code change after this prompt in the same session.",
-      prompt.title
-    );
-  }
-
-  for (const event of sortedEvents) {
-    const laterInSession = sortedEvents.filter((candidate) => isAfter(candidate, event) && candidate.sessionId === event.sessionId);
-    if ((event.lane === "Code" || event.lane === "Architecture") && event.status !== "failed") {
-      addEdge(
-        event,
-        laterInSession.find((candidate) => candidate.lane === "Verification" && candidate.status === "success"),
-        "verified_by",
-        "inferred",
-        "Nearest successful verification after this change in the same session."
-      );
-      addEdge(
-        event,
-        laterInSession.find((candidate) => candidate.toolName === "git" || Boolean(candidate.commitHash)),
-        "committed_as",
-        "deterministic",
-        "Nearest git commit after this change in the same session."
-      );
-    }
-
-    if (event.status === "failed") {
-      addEdge(
-        event,
-        laterInSession.find(isRetryEvent),
-        "retried_by",
-        "inferred",
-        "A later agent message or command indicates the failed step was retried."
-      );
-    } else {
-      addEdge(
-        event,
-        laterInSession.find((candidate) => candidate.status === "failed" && (candidate.lane === "Risks" || candidate.lane === "Verification")),
-        "failed_by",
-        "inferred",
-        "Nearest failed verification or risk event after this step in the same session."
-      );
-    }
+  const sessions = groupBySession(sortedEvents);
+  for (const sessionEvents of sessions.values()) {
+    addPromptEdges(sessionEvents, addEdge);
+    addForwardCausalEdges(sessionEvents, addEdge);
   }
 
   return [...edges.values()].sort((a, b) => {
     const fromDelta = (byId.get(a.fromEventId)?.timestamp ?? "").localeCompare(byId.get(b.fromEventId)?.timestamp ?? "");
     return fromDelta || (byId.get(a.toEventId)?.timestamp ?? "").localeCompare(byId.get(b.toEventId)?.timestamp ?? "") || a.type.localeCompare(b.type);
   });
+}
+
+function groupBySession(events: TimelineEvent[]): Map<string, TimelineEvent[]> {
+  const sessions = new Map<string, TimelineEvent[]>();
+  for (const event of events) {
+    const current = sessions.get(event.sessionId) ?? [];
+    current.push(event);
+    sessions.set(event.sessionId, current);
+  }
+  return sessions;
+}
+
+function addPromptEdges(
+  sessionEvents: TimelineEvent[],
+  addEdge: (from: TimelineEvent | undefined, to: TimelineEvent | undefined, type: CausalEdgeType, confidence: CausalConfidence, reason: string, evidence?: string | null) => void
+) {
+  let pendingPrompts: TimelineEvent[] = [];
+  for (const event of sessionEvents) {
+    if (event.kind === "user_prompt") {
+      pendingPrompts.push(event);
+      continue;
+    }
+
+    if (pendingPrompts.length === 0) continue;
+    if (event.lane === "Architecture" && (event.kind === "file_change" || event.kind === "tool_call")) {
+      for (const prompt of pendingPrompts) {
+        addEdge(prompt, event, "updates_design", "inferred", "First architecture or design artifact after this prompt in the same session.", prompt.title);
+      }
+    }
+    if (event.lane === "Code" && (event.kind === "file_change" || event.toolName === "git")) {
+      for (const prompt of pendingPrompts) {
+        addEdge(prompt, event, "implements_prompt", "inferred", "First code change after this prompt in the same session.", prompt.title);
+      }
+    }
+
+    if (event.lane === "Architecture" || event.lane === "Code") {
+      pendingPrompts = pendingPrompts.filter((prompt) => {
+        const hasArchitectureEdge = event.lane === "Architecture";
+        const hasCodeEdge = event.lane === "Code";
+        return !(hasArchitectureEdge || hasCodeEdge) || prompt.id === event.id;
+      });
+    }
+  }
+}
+
+function addForwardCausalEdges(
+  sessionEvents: TimelineEvent[],
+  addEdge: (from: TimelineEvent | undefined, to: TimelineEvent | undefined, type: CausalEdgeType, confidence: CausalConfidence, reason: string, evidence?: string | null) => void
+) {
+  const pendingVerification: TimelineEvent[] = [];
+  const pendingCommit: TimelineEvent[] = [];
+  const pendingRetry: TimelineEvent[] = [];
+  const pendingFailure: TimelineEvent[] = [];
+
+  for (const event of sessionEvents) {
+    if (event.lane === "Verification" && event.status === "success") {
+      for (const source of pendingVerification.splice(0)) {
+        addEdge(source, event, "verified_by", "inferred", "Nearest successful verification after this change in the same session.");
+      }
+    }
+
+    if (event.toolName === "git" || Boolean(event.commitHash)) {
+      for (const source of pendingCommit.splice(0)) {
+        addEdge(source, event, "committed_as", "deterministic", "Nearest git commit after this change in the same session.");
+      }
+    }
+
+    if (isRetryEvent(event)) {
+      for (const source of pendingRetry.splice(0)) {
+        addEdge(source, event, "retried_by", "inferred", "A later agent message or command indicates the failed step was retried.");
+      }
+    }
+
+    if (event.status === "failed" && (event.lane === "Risks" || event.lane === "Verification")) {
+      for (const source of pendingFailure.splice(0)) {
+        addEdge(source, event, "failed_by", "inferred", "Nearest failed verification or risk event after this step in the same session.");
+      }
+    }
+
+    if ((event.lane === "Code" || event.lane === "Architecture") && event.status !== "failed") {
+      pendingVerification.push(event);
+      pendingCommit.push(event);
+    }
+    if (event.status === "failed") {
+      pendingRetry.push(event);
+    } else {
+      pendingFailure.push(event);
+    }
+  }
 }
 
 export function groupEpisodes(projectId: string, events: TimelineEvent[]): Episode[] {

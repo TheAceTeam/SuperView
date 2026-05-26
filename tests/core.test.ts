@@ -5,6 +5,7 @@ import { redactString } from "../core/redactor";
 import { normalizeCodexLines } from "../core/normalizer";
 import { buildProjectTimeline } from "../core/timeline";
 import { buildReplayNodes } from "../core/replay";
+import type { TimelineEvent } from "../core/types";
 
 function fixture(name: string) {
   return readFileSync(`tests/fixtures/codex-rollouts/${name}`, "utf8");
@@ -121,6 +122,42 @@ describe("Codex parser and normalizer", () => {
       ])
     );
     expect(causalEdges.every((edge) => edge.reason.length > 0)).toBe(true);
+  });
+
+  it("builds large timelines without quadratic causal scans", () => {
+    const project = {
+      id: "project-large",
+      name: "large",
+      cwd: "/tmp/large",
+      repoRoot: null,
+      createdAt: "2026-05-25T00:00:00.000Z",
+      updatedAt: "2026-05-25T00:00:00.000Z"
+    };
+    const baseTime = Date.parse("2026-05-25T00:00:00.000Z");
+    const events: TimelineEvent[] = Array.from({ length: 12000 }, (_, index) => ({
+      id: `event-${index}`,
+      projectId: project.id,
+      sessionId: `session-${Math.floor(index / 120)}`,
+      turnId: `turn-${Math.floor(index / 12)}`,
+      timestamp: new Date(baseTime + index * 1000).toISOString(),
+      kind: index % 120 === 0 ? "user_prompt" : index % 17 === 0 ? "verification" : index % 7 === 0 ? "tool_call" : "assistant_message",
+      lane: index % 120 === 0 ? "Product" : index % 17 === 0 ? "Verification" : index % 7 === 0 ? "Code" : "Agent Runs",
+      title: `Event ${index}`,
+      detail: index % 211 === 0 ? "retry after failure" : null,
+      toolName: index % 7 === 0 ? "functions.exec_command" : null,
+      callId: index % 7 === 0 ? `call-${index}` : null,
+      status: index % 211 === 0 ? "failed" : "success",
+      files: [],
+      rawEventRefId: null
+    }));
+
+    const started = performance.now();
+    const timeline = buildProjectTimeline(project, events);
+    const elapsed = performance.now() - started;
+
+    expect(timeline.events).toHaveLength(events.length);
+    expect(timeline.taskJourneys.length).toBeGreaterThan(10);
+    expect(elapsed).toBeLessThan(1000);
   });
 
   it("associates function call outputs with calls and derives lanes for docs, failures, and retries", () => {

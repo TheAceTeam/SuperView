@@ -438,8 +438,8 @@ export class SuperViewDatabase {
     };
   }
 
-  getTaskJourneyDetail(journeyId: string): TaskJourneyDetail | null {
-    const projects = this.listProjects();
+  getTaskJourneyDetail(journeyId: string, projectId?: string): TaskJourneyDetail | null {
+    const projects = projectId ? [this.getProject(projectId)].filter((project): project is ProjectRecord => Boolean(project)) : this.listProjects();
     for (const project of projects) {
       const events = this.listEvents(project.id);
       const timeline = buildProjectTimeline(project, events);

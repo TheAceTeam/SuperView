@@ -253,7 +253,9 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   });
 
   await page.route("**/api/task-journeys/*", async (route) => {
-    const journeyId = route.request().url().match(/\/api\/task-journeys\/([^/?]+)/)?.[1] ?? "task-unknown";
+    const requestUrl = new URL(route.request().url());
+    expect(requestUrl.searchParams.get("projectId")).toBe("project-fixture");
+    const journeyId = requestUrl.pathname.match(/\/api\/task-journeys\/([^/?]+)/)?.[1] ?? "task-unknown";
     journeyDetailRequests.push(journeyId);
     const offset = Number(journeyId.replace("task-", "")) || 0;
     const baseTime = Date.parse("2026-05-25T02:00:00.000Z");
@@ -360,21 +362,23 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await expect(page.locator(".lane-label")).toHaveCount(0);
   await expect(page.getByText("1-300 of 340")).toBeVisible();
   await expect(page.getByText("4 task journeys loaded from 300 events")).toBeVisible();
+  await expect(journeyDetailRequests).toEqual([]);
+  await page.locator(".conversation-turn").first().getByRole("button", { name: "查看细节" }).click();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-0").length).toBe(1);
-  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-75").length).toBe(1);
-  await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-150").length).toBe(1);
   await expect(journeyDetailRequests).not.toContain("task-225");
   await page.getByRole("button", { name: /User task 225.*75 events/ }).click();
+  await expect(journeyDetailRequests).not.toContain("task-225");
+  await page.locator(".conversation-turn").filter({ hasText: "User task 225" }).getByRole("button", { name: "查看细节" }).click();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-225").length).toBe(1);
   await expect(page.locator(".conversation-turn").filter({ hasText: "Codex completed task 225 in CLI output." })).toBeVisible();
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByText("301-340 of 340")).toBeVisible();
   await expect(page.locator(".conversation-turn")).toHaveCount(1);
   await page.getByRole("button", { name: /User task 300.*40 events/ }).click();
+  await expect(journeyDetailRequests).not.toContain("task-300");
+  await page.locator(".conversation-turn").filter({ hasText: "User task 300" }).getByRole("button", { name: "查看细节" }).click();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-300").length).toBe(1);
   await expect(page.getByText("Codex completed task 300 in CLI output.")).toBeVisible();
-  await expect(page.getByText("Loaded task detail 302")).toHaveCount(0);
-  await page.getByRole("button", { name: "查看细节" }).click();
   await expect(page.getByText("Background Work", { exact: true })).toBeVisible();
   await expect(page.getByText("Log", { exact: true })).toBeVisible();
   await expect(page.getByText("Loaded task detail 302")).toBeVisible();

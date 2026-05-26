@@ -70,7 +70,8 @@ export function createServer() {
   });
 
   app.get("/api/task-journeys/:id", (req, res) => {
-    const detail = db.getTaskJourneyDetail(req.params.id);
+    const projectId = firstQueryValue(req.query.projectId);
+    const detail = db.getTaskJourneyDetail(req.params.id, projectId);
     if (!detail) {
       res.status(404).json({ error: "task journey not found" });
       return;

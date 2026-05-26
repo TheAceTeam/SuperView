@@ -50,8 +50,11 @@ export async function fetchEventEvidence(eventId: string): Promise<EventEvidence
   return (await response.json()) as EventEvidence;
 }
 
-export async function fetchTaskJourneyDetail(journeyId: string): Promise<TaskJourneyDetail> {
-  const response = await fetch(`/api/task-journeys/${journeyId}`);
+export async function fetchTaskJourneyDetail(journeyId: string, projectId?: string): Promise<TaskJourneyDetail> {
+  const params = new URLSearchParams();
+  if (projectId) params.set("projectId", projectId);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`/api/task-journeys/${journeyId}${suffix}`);
   if (!response.ok) throw new Error("Failed to load task journey detail");
   return (await response.json()) as TaskJourneyDetail;
 }
