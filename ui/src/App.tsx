@@ -159,7 +159,7 @@ export function App() {
     setSelectedJourneyId(journeyId);
     void loadJourneyDetail(journeyId);
     const summary = timeline?.taskJourneys.find((journey) => journey.id === journeyId);
-    const promptEvent = summary ? eventsById.get(summary.promptEventId) : null;
+    const promptEvent = summary ? timelineEventsById.get(summary.promptEventId) : null;
     if (promptEvent) {
       setSelectedEvent(promptEvent);
     }
@@ -174,18 +174,18 @@ export function App() {
   }
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
-  const selectedJourney = useMemo(() => timeline?.taskJourneys.find((journey) => journey.id === selectedJourneyId) ?? timeline?.taskJourneys[0] ?? null, [timeline, selectedJourneyId]);
-  const selectedJourneyDetail = selectedJourney ? journeyDetails[selectedJourney.id] : null;
+  const journeys = timeline?.taskJourneys ?? [];
+  const selectedJourney = useMemo(() => journeys.find((journey) => journey.id === selectedJourneyId) ?? journeys[0] ?? null, [journeys, selectedJourneyId]);
+  const selectedJourneyDetails = useMemo(() => journeys.map((journey) => journeyDetails[journey.id]).filter((detail): detail is TaskJourneyDetail => Boolean(detail)), [journeys, journeyDetails]);
   const timelineEventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
-  const detailEvents = selectedJourneyDetail?.events ?? [];
+  const detailEvents = useMemo(() => selectedJourneyDetails.flatMap((detail) => detail.events), [selectedJourneyDetails]);
   const eventsById = useMemo(() => mergeEventMaps(timelineEventsById, detailEvents), [timelineEventsById, detailEvents]);
 
-  const selectedJourneyExpanded = selectedJourney ? Boolean(expandedJourneyIds[selectedJourney.id]) : false;
   const drawerEvent = selectedEvent;
   const drawerEvidence = eventEvidence?.event.id === drawerEvent?.id ? eventEvidence : null;
   const drawerArtifacts = drawerEvidence?.artifacts ?? [];
   const drawerEvents = useMemo(() => mergeEvents(timeline?.events ?? [], detailEvents), [timeline, detailEvents]);
-  const causalEdges = selectedJourneyDetail?.causalEdges ?? timeline?.causalEdges ?? [];
+  const causalEdges = useMemo(() => [...(timeline?.causalEdges ?? []), ...selectedJourneyDetails.flatMap((detail) => detail.causalEdges)], [timeline, selectedJourneyDetails]);
   const causalView = useMemo(() => buildCausalView(drawerEvents, causalEdges, drawerEvent?.id ?? null), [drawerEvents, causalEdges, drawerEvent?.id]);
   const totalEvents = timeline?.totalEvents ?? timeline?.events.length ?? 0;
   const currentLimit = timeline?.limit ?? TIMELINE_LIMIT;
@@ -286,14 +286,15 @@ export function App() {
               </div>
               {showCausalPaths ? <CausalRibbon view={causalView} /> : null}
               <ConversationThread
-                journey={selectedJourneyDetail?.journey ?? selectedJourney}
-                detail={selectedJourneyDetail}
-                expanded={selectedJourneyExpanded}
-                loading={selectedJourney ? Boolean(journeyLoadingIds[selectedJourney.id]) : false}
+                journeys={journeys}
+                detailsByJourneyId={journeyDetails}
+                timelineEventsById={timelineEventsById}
+                expandedJourneyIds={expandedJourneyIds}
+                loadingJourneyIds={journeyLoadingIds}
                 selectedEventId={drawerEvent?.id ?? null}
                 causalView={causalView}
                 showCausalPaths={showCausalPaths}
-                onToggleDetails={() => selectedJourney ? toggleJourneyDetails(selectedJourney.id) : undefined}
+                onToggleDetails={toggleJourneyDetails}
                 onSelectEvent={(event) => {
                   setSelectedEvent(event);
                 }}
@@ -413,8 +414,57 @@ function CausalRibbon({ view }: { view: CausalView }) {
 }
 
 function ConversationThread({
+  journeys,
+  detailsByJourneyId,
+  timelineEventsById,
+  expandedJourneyIds,
+  loadingJourneyIds,
+  selectedEventId,
+  causalView,
+  showCausalPaths,
+  onToggleDetails,
+  onSelectEvent
+}: {
+  journeys: TaskJourney[];
+  detailsByJourneyId: Record<string, TaskJourneyDetail>;
+  timelineEventsById: Map<string, TimelineEvent>;
+  expandedJourneyIds: Record<string, boolean>;
+  loadingJourneyIds: Record<string, boolean>;
+  selectedEventId: string | null;
+  causalView: CausalView;
+  showCausalPaths: boolean;
+  onToggleDetails: (journeyId: string) => void;
+  onSelectEvent: (event: TimelineEvent) => void;
+}) {
+  if (journeys.length === 0) {
+    return <p className="muted">No user-input task journeys are visible on this page.</p>;
+  }
+
+  return (
+    <div className="conversation-thread" aria-label="Task conversation thread">
+      {journeys.map((journey) => (
+        <ConversationTurn
+          key={journey.id}
+          journey={journey}
+          detail={detailsByJourneyId[journey.id] ?? null}
+          fallbackPrompt={timelineEventsById.get(journey.promptEventId) ?? null}
+          expanded={Boolean(expandedJourneyIds[journey.id])}
+          loading={Boolean(loadingJourneyIds[journey.id])}
+          selectedEventId={selectedEventId}
+          causalView={causalView}
+          showCausalPaths={showCausalPaths}
+          onToggleDetails={() => onToggleDetails(journey.id)}
+          onSelectEvent={onSelectEvent}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ConversationTurn({
   journey,
   detail,
+  fallbackPrompt,
   expanded,
   loading,
   selectedEventId,
@@ -423,8 +473,9 @@ function ConversationThread({
   onToggleDetails,
   onSelectEvent
 }: {
-  journey: TaskJourney | null;
+  journey: TaskJourney;
   detail: TaskJourneyDetail | null;
+  fallbackPrompt: TimelineEvent | null;
   expanded: boolean;
   loading: boolean;
   selectedEventId: string | null;
@@ -433,12 +484,8 @@ function ConversationThread({
   onToggleDetails: () => void;
   onSelectEvent: (event: TimelineEvent) => void;
 }) {
-  if (!journey) {
-    return <p className="muted">No user-input task journeys are visible on this page.</p>;
-  }
-
   const events = detail?.events ?? [];
-  const prompt = events.find((event) => event.id === journey.promptEventId || event.kind === "user_prompt");
+  const prompt = fallbackPrompt ?? events.find((event) => event.id === journey.promptEventId || event.kind === "user_prompt");
   const assistantMessage = events.find((event) => event.kind === "assistant_message");
   const backgroundEvents = events.filter((event) => event.kind !== "user_prompt" && event.id !== assistantMessage?.id);
   const logEvents = events.filter((event) => event.kind === "tool_call" || event.kind === "tool_result" || event.kind === "file_change" || event.kind === "verification" || event.kind === "error");
@@ -446,7 +493,7 @@ function ConversationThread({
   const promptText = prompt?.detail ?? journey.title;
 
   return (
-    <article className={`conversation-thread ${journey.status}`}>
+    <article className={`conversation-turn ${journey.status}`}>
       <div className="conversation-summary">
         <strong>{journey.title}</strong>
         <div>
@@ -457,18 +504,11 @@ function ConversationThread({
         </div>
       </div>
 
-      <div className="message-thread">
-        <button className={`conversation-message user ${prompt?.id === selectedEventId ? "selected" : ""}`} onClick={() => prompt ? onSelectEvent(prompt) : undefined}>
-          <span className="message-meta">User</span>
-          <strong>{journey.title}</strong>
-          <p>{promptText}</p>
-        </button>
-
-        <button className={`conversation-message codex ${assistantMessage?.id === selectedEventId ? "selected" : ""}`} onClick={() => assistantMessage ? onSelectEvent(assistantMessage) : undefined}>
-          <span className="message-meta">Codex CLI</span>
-          <p>{codexOutput}</p>
-        </button>
-      </div>
+      <button className={`conversation-message user ${prompt?.id === selectedEventId ? "selected" : ""}`} onClick={() => prompt ? onSelectEvent(prompt) : undefined}>
+        <span className="message-meta">User</span>
+        <strong>{journey.title}</strong>
+        <p>{promptText}</p>
+      </button>
 
       <button className="detail-toggle" onClick={onToggleDetails}>{expanded ? "隐藏细节" : "查看细节"}</button>
 
@@ -515,6 +555,11 @@ function ConversationThread({
           </section>
         </div>
       ) : null}
+
+      <button className={`conversation-message codex ${assistantMessage?.id === selectedEventId ? "selected" : ""}`} onClick={() => assistantMessage ? onSelectEvent(assistantMessage) : undefined}>
+        <span className="message-meta">Codex CLI</span>
+        <p>{codexOutput}</p>
+      </button>
     </article>
   );
 }

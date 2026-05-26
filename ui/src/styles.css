@@ -541,19 +541,24 @@ select {
 
 .conversation-thread {
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 20px;
+}
+
+.conversation-turn {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid var(--line);
   border-left: 4px solid var(--orange);
   border-radius: 8px;
   background: color-mix(in srgb, var(--surface-2) 88%, transparent);
 }
 
-.conversation-thread.failed {
+.conversation-turn.failed {
   border-left-color: var(--danger);
 }
 
-.conversation-thread.success {
+.conversation-turn.success {
   border-left-color: var(--success);
 }
 
@@ -580,11 +585,6 @@ select {
   padding: 4px 8px;
   border-radius: 999px;
   background: var(--surface-soft);
-}
-
-.message-thread {
-  display: grid;
-  gap: 12px;
 }
 
 .conversation-message {
@@ -632,6 +632,7 @@ select {
 .detail-toggle {
   justify-self: start;
   min-height: 36px;
+  margin-left: 36px;
   padding: 0 13px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -648,8 +649,12 @@ select {
 .background-details {
   display: grid;
   gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  width: min(820px, calc(100% - 36px));
+  margin-left: 36px;
+  padding: 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 76%, var(--surface-2));
 }
 
 .detail-section-heading {
