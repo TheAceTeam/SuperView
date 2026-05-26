@@ -14,7 +14,6 @@ export function App() {
   const [timelineOffset, setTimelineOffset] = useState(0);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
-  const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
   const [journeyDetails, setJourneyDetails] = useState<Record<string, TaskJourneyDetail>>({});
   const [journeyLoadingIds, setJourneyLoadingIds] = useState<Record<string, boolean>>({});
   const journeyLoadingRef = useRef(new Set<string>());
@@ -40,11 +39,6 @@ export function App() {
     if (!selectedProjectId) return;
     void loadTimeline(selectedProjectId, 0);
   }, [selectedProjectId]);
-
-  useEffect(() => {
-    if (!timeline || timeline.taskJourneys.length === 0) return;
-    setSelectedJourneyId((current) => current ?? timeline.taskJourneys[0]?.id ?? null);
-  }, [timeline]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -109,7 +103,6 @@ export function App() {
       setTimeline(next);
       setTimelineOffset(next.offset ?? offset);
       setSelectedEvent(next.events[0] ?? null);
-      setSelectedJourneyId(next.taskJourneys[0]?.id ?? null);
       setExpandedJourneyIds({});
       setError(null);
     } catch (loadError) {
@@ -153,15 +146,6 @@ export function App() {
     }
   }
 
-  function selectJourney(journeyId: string) {
-    setSelectedJourneyId(journeyId);
-    const summary = timeline?.taskJourneys.find((journey) => journey.id === journeyId);
-    const promptEvent = summary ? timelineEventsById.get(summary.promptEventId) : null;
-    if (promptEvent) {
-      setSelectedEvent(promptEvent);
-    }
-  }
-
   function toggleJourneyDetails(journeyId: string) {
     setExpandedJourneyIds((current) => {
       const nextExpanded = !current[journeyId];
@@ -172,7 +156,6 @@ export function App() {
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
   const journeys = timeline?.taskJourneys ?? [];
-  const selectedJourney = useMemo(() => journeys.find((journey) => journey.id === selectedJourneyId) ?? journeys[0] ?? null, [journeys, selectedJourneyId]);
   const selectedJourneyDetails = useMemo(() => journeys.map((journey) => journeyDetails[journey.id]).filter((detail): detail is TaskJourneyDetail => Boolean(detail)), [journeys, journeyDetails]);
   const timelineEventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
   const detailEvents = useMemo(() => selectedJourneyDetails.flatMap((detail) => detail.events), [selectedJourneyDetails]);
@@ -224,10 +207,24 @@ export function App() {
             <h1>{selectedProject?.name ?? "No project indexed yet"}</h1>
             <p className="lead">Replay each user input as the Codex CLI conversation, with background work available on demand.</p>
           </div>
-          <div className="status-cluster">
-            <Metric label="Projects" value={projects.length} />
-            <Metric label="Events" value={totalEvents} />
-            <Metric label="Tasks" value={timeline?.taskJourneys.length ?? 0} />
+          <div className="title-actions">
+            <div className="project-selector-panel">
+              <label className="field-label" htmlFor="project-select">Project</label>
+              <select id="project-select" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)}>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="status-cluster">
+              <Metric label="Projects" value={projects.length} />
+              <Metric label="Events" value={totalEvents} />
+              <Metric label="Tasks" value={timeline?.taskJourneys.length ?? 0} />
+              <Metric label="Tokens" value={timeline?.tokenUsage.total ?? 0} />
+              <Metric label="Input" value={timeline?.tokenUsage.input ?? 0} />
+              <Metric label="Output" value={timeline?.tokenUsage.output ?? 0} />
+              <Metric label="Reasoning" value={timeline?.tokenUsage.reasoning ?? 0} />
+            </div>
           </div>
         </section>
 
@@ -240,30 +237,6 @@ export function App() {
           <EmptyState title="No Codex runs indexed" detail="Scan local rollout JSONL files from ~/.codex/sessions to build the first timeline." codexHome={codexHome} onCodexHomeChange={setCodexHome} onScan={handleScan} />
         ) : (
           <div className="dashboard-grid conversation-dashboard-grid">
-            <aside className="input-navigator project-input-sidebar">
-              <div className="project-selector-panel">
-                <label className="field-label" htmlFor="project-select">Project</label>
-                <select id="project-select" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)}>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>{project.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="panel-heading">
-                <Search size={17} />
-                <span>User Inputs</span>
-                <em>{timeline?.taskJourneys.length ?? 0}</em>
-              </div>
-              <div className="input-nav-list">
-                {(timeline?.taskJourneys ?? []).map((journey, index) => (
-                  <button key={journey.id} className={`input-nav-row ${selectedJourney?.id === journey.id ? "active" : ""}`} onClick={() => selectJourney(journey.id)}>
-                    <strong>{journey.title}</strong>
-                    <small>{index + 1} · {journey.eventIds.length} events · {formatExitType(journey.exitType)}</small>
-                  </button>
-                ))}
-              </div>
-            </aside>
-
             <section className="timeline-panel">
               <div className="panel-heading">
                 <FileText size={17} />
@@ -511,7 +484,15 @@ function ConversationTurn({
         onSelect={() => prompt ? onSelectEvent(prompt) : undefined}
       />
 
-      <button className="detail-toggle" onClick={onToggleDetails}>{expanded ? "隐藏细节" : "查看细节"}</button>
+      <div className="message-row codex detail-message-row">
+        <span className="message-avatar" aria-hidden="true">C</span>
+        <div className="message-stack">
+          <button className="conversation-message codex detail-toggle" onClick={onToggleDetails}>
+            <span className="message-meta">Agent work</span>
+            <span>{expanded ? "收起过程..." : "查看过程..."}</span>
+          </button>
+        </div>
+      </div>
 
       {expanded ? (
         <div className="background-details">
@@ -638,7 +619,7 @@ function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="metric">
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong>{value.toLocaleString()}</strong>
     </div>
   );
 }
