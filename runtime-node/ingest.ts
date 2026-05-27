@@ -9,6 +9,8 @@ import { parseCodexHistoryJsonlFile } from "./history";
 import { scanRolloutFiles } from "./scanner";
 import { getCommits, getRepoRoot } from "./git-provider";
 
+export const INGEST_PROCESSOR_VERSION = "2026-05-27-token-count-v1";
+
 export class IngestService {
   private running = new Set<string>();
 
@@ -56,7 +58,7 @@ export class IngestService {
         try {
           const fileStat = await stat(file);
           const previous = this.db.getIngestedFile(file);
-          if (previous && previous.mtimeMs === fileStat.mtimeMs && previous.sizeBytes === fileStat.size) {
+          if (previous && previous.mtimeMs === fileStat.mtimeMs && previous.sizeBytes === fileStat.size && previous.processorVersion === INGEST_PROCESSOR_VERSION) {
             job.skippedFiles = (job.skippedFiles ?? 0) + 1;
             job.processedFiles += 1;
             this.db.upsertJob(job);
@@ -78,6 +80,7 @@ export class IngestService {
               sizeBytes: fileStat.size,
               sha256: lines.at(-1)?.sha256 ?? null,
               sessionId: bundle.session.id,
+              processorVersion: INGEST_PROCESSOR_VERSION,
               processedAt: new Date().toISOString()
             });
             projectCount += 1;
@@ -90,6 +93,7 @@ export class IngestService {
               sizeBytes: fileStat.size,
               sha256: lines.at(-1)?.sha256 ?? null,
               sessionId: null,
+              processorVersion: INGEST_PROCESSOR_VERSION,
               processedAt: new Date().toISOString()
             });
           }

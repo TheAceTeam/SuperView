@@ -66,6 +66,7 @@ export function normalizeCodexLines(lines: ParsedCodexLine[], options: Normalize
   const turns = new Map<string, TurnRecord>();
   const events: TimelineEvent[] = [];
   const artifacts: Artifact[] = [];
+  let previousTotalTokenUsage: TokenUsage | null = null;
 
   for (const [index, line] of lines.entries()) {
     const rawRef = rawEventRefs[index];
@@ -108,7 +109,11 @@ export function normalizeCodexLines(lines: ParsedCodexLine[], options: Normalize
     }
 
     if (line.type === "event_msg") {
-      const event = normalizeEventMessage({ line, rawRef, projectId, sessionId, turnId, payload, payloadType: payloadType ?? undefined });
+      const event = normalizeEventMessage({ line, rawRef, projectId, sessionId, turnId, payload, rawPayload, payloadType: payloadType ?? undefined, previousTotalTokenUsage });
+      if (event.kind === "token_usage") {
+        const totalUsage = extractTokenCountTotalUsage(rawPayload) ?? extractTokenCountTotalUsage(payload);
+        previousTotalTokenUsage = totalUsage ?? (event.tokenUsage ? addTokenUsage(previousTotalTokenUsage, event.tokenUsage) : previousTotalTokenUsage);
+      }
       events.push(event);
       if (event.kind === "error") {
         artifacts.push(makeArtifact(event, rawRef, payload));
@@ -214,9 +219,29 @@ function normalizeEventMessage(input: {
   sessionId: string;
   turnId: string | null;
   payload: Record<string, unknown>;
+  rawPayload: Record<string, unknown>;
   payloadType?: string;
+  previousTotalTokenUsage?: TokenUsage | null;
 }): TimelineEvent {
-  const { line, rawRef, projectId, sessionId, turnId, payload, payloadType } = input;
+  const { line, rawRef, projectId, sessionId, turnId, payload, rawPayload, payloadType, previousTotalTokenUsage } = input;
+  if (payloadType === "token_count") {
+    const totalUsage = extractTokenCountTotalUsage(rawPayload) ?? extractTokenCountTotalUsage(payload);
+    const tokenUsage = tokenUsageDelta(previousTotalTokenUsage, totalUsage);
+    return makeEvent({
+      line,
+      rawRef,
+      projectId,
+      sessionId,
+      turnId,
+      kind: "token_usage",
+      lane: "Agent Runs",
+      title: "Token usage update",
+      detail: safeExcerpt(payload, 800),
+      status: "success",
+      tokenUsage
+    });
+  }
+
   const message = stringValue(payload.message) ?? stringValue(payload.msg) ?? payloadType ?? "Event";
   const failed = /error|failed|abort|panic/i.test(message);
   return makeEvent({
@@ -413,6 +438,62 @@ function extractTokenUsage(payload: Record<string, unknown>): TokenUsage | null 
     cachedInput: cachedInput ?? 0,
     total: total ?? 0
   };
+}
+
+function extractTokenCountTotalUsage(payload: Record<string, unknown>): TokenUsage | null {
+  const info = asRecord(payload.info);
+  const total = asRecord(info.total_token_usage ?? info.totalTokenUsage ?? payload.total_token_usage ?? payload.totalTokenUsage);
+  if (Object.keys(total).length === 0) return null;
+  return tokenUsageFromContainer(total);
+}
+
+function tokenUsageFromContainer(container: Record<string, unknown>): TokenUsage | null {
+  const input = firstNumber(container, ["input_tokens", "prompt_tokens", "input", "prompt"]);
+  const output = firstNumber(container, ["output_tokens", "completion_tokens", "output", "completion"]);
+  const reasoning = firstNumber(container, ["reasoning_output_tokens", "reasoning_tokens", "reasoning"]);
+  const cachedInput = firstNumber(container, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input"]);
+  const explicitTotal = firstNumber(container, ["total_tokens", "total"]);
+  const knownSum = sumNumbers(input, output);
+  const total = explicitTotal ?? knownSum;
+
+  if (input === null && output === null && reasoning === null && cachedInput === null && total === null) {
+    return null;
+  }
+
+  return {
+    input: input ?? 0,
+    output: output ?? 0,
+    reasoning: reasoning ?? 0,
+    cachedInput: cachedInput ?? 0,
+    total: total ?? 0
+  };
+}
+
+function tokenUsageDelta(previous: TokenUsage | null | undefined, current: TokenUsage | null): TokenUsage | null {
+  if (!current) return null;
+  if (!previous) return current;
+  const delta = {
+    input: Math.max(0, current.input - previous.input),
+    output: Math.max(0, current.output - previous.output),
+    reasoning: Math.max(0, current.reasoning - previous.reasoning),
+    cachedInput: Math.max(0, current.cachedInput - previous.cachedInput),
+    total: Math.max(0, current.total - previous.total)
+  };
+  return hasTokenUsage(delta) ? delta : null;
+}
+
+function addTokenUsage(previous: TokenUsage | null | undefined, delta: TokenUsage): TokenUsage {
+  return {
+    input: (previous?.input ?? 0) + delta.input,
+    output: (previous?.output ?? 0) + delta.output,
+    reasoning: (previous?.reasoning ?? 0) + delta.reasoning,
+    cachedInput: (previous?.cachedInput ?? 0) + delta.cachedInput,
+    total: (previous?.total ?? 0) + delta.total
+  };
+}
+
+function hasTokenUsage(usage: TokenUsage): boolean {
+  return usage.input > 0 || usage.output > 0 || usage.reasoning > 0 || usage.cachedInput > 0 || usage.total > 0;
 }
 
 function collectUsageContainers(payload: Record<string, unknown>): unknown[] {

@@ -6,6 +6,7 @@ import type express from "express";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createServer } from "../runtime-node/server";
+import { INGEST_PROCESSOR_VERSION } from "../runtime-node/ingest";
 
 let dataDir: string;
 let codexHome: string;
@@ -115,6 +116,24 @@ describe("SuperView API", () => {
     expect(journeyDetail.body.journey.id).toBe(firstJourney.id);
     expect(journeyDetail.body.events.map((event: { id: string }) => event.id)).toEqual(firstJourney.eventIds);
     expect(Array.isArray(journeyDetail.body.causalEdges)).toBe(true);
+  });
+
+  it("reprocesses unchanged files when their stored processor version is stale", async () => {
+    const app = createServer();
+
+    const firstJob = await runIngest(app, codexHome);
+    expect(firstJob.status).toBe("completed");
+
+    const dbPath = path.join(dataDir, "superview.sqlite");
+    execFileSync("sqlite3", [dbPath, "UPDATE ingested_files SET processor_version = 'legacy-tokenless-parser'"]);
+
+    const secondJob = await runIngest(app, codexHome);
+    expect(secondJob.status).toBe("completed");
+    expect(secondJob.processedFiles).toBe(1);
+    expect(secondJob.skippedFiles).toBe(0);
+
+    const storedVersion = execFileSync("sqlite3", [dbPath, "SELECT processor_version FROM ingested_files LIMIT 1"], { encoding: "utf8" }).trim();
+    expect(storedVersion).toBe(INGEST_PROCESSOR_VERSION);
   });
 
   it("adds git commits to the project timeline when sessions belong to a git repo", async () => {

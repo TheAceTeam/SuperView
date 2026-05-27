@@ -93,6 +93,36 @@ describe("Codex parser and normalizer", () => {
     });
   });
 
+  it("extracts token_count snapshots as deltas instead of double-counting repeats", () => {
+    const content = [
+      JSON.stringify({ timestamp: "2026-05-25T05:00:00.000Z", type: "session_meta", payload: { id: "fixture-token-count-session", timestamp: "2026-05-25T05:00:00.000Z", cwd: "/tmp/superview-fixture", cli_version: "0.125.0", model_provider: "OpenAI", source: "cli" } }),
+      JSON.stringify({ timestamp: "2026-05-25T05:00:01.000Z", type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "Inspect token count events" }] } }),
+      JSON.stringify({ timestamp: "2026-05-25T05:00:02.000Z", type: "event_msg", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 100, cached_input_tokens: 25, output_tokens: 20, reasoning_output_tokens: 5, total_tokens: 120 }, last_token_usage: { input_tokens: 100, cached_input_tokens: 25, output_tokens: 20, reasoning_output_tokens: 5, total_tokens: 120 }, model_context_window: 258400 } } }),
+      JSON.stringify({ timestamp: "2026-05-25T05:00:03.000Z", type: "event_msg", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 100, cached_input_tokens: 25, output_tokens: 20, reasoning_output_tokens: 5, total_tokens: 120 }, last_token_usage: { input_tokens: 100, cached_input_tokens: 25, output_tokens: 20, reasoning_output_tokens: 5, total_tokens: 120 }, model_context_window: 258400 } } }),
+      JSON.stringify({ timestamp: "2026-05-25T05:00:04.000Z", type: "event_msg", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 150, cached_input_tokens: 30, output_tokens: 30, reasoning_output_tokens: 8, total_tokens: 180 }, last_token_usage: { input_tokens: 50, cached_input_tokens: 5, output_tokens: 10, reasoning_output_tokens: 3, total_tokens: 60 }, model_context_window: 258400 } } })
+    ].join("\n");
+    const lines = parseCodexJsonlContent(content, "token-count-rollout.jsonl");
+    const bundle = normalizeCodexLines(lines, { repoRoot: "/tmp/superview-fixture" });
+    expect(bundle).toBeTruthy();
+
+    const tokenEvents = bundle!.events.filter((event) => event.title === "Token usage update");
+    const timeline = buildProjectTimeline(bundle!.project, bundle!.events);
+
+    expect(tokenEvents.map((event) => event.tokenUsage)).toEqual([
+      { input: 100, output: 20, reasoning: 5, cachedInput: 25, total: 120 },
+      null,
+      { input: 50, output: 10, reasoning: 3, cachedInput: 5, total: 60 }
+    ]);
+    expect(timeline.tokenUsage).toEqual({
+      input: 150,
+      output: 30,
+      reasoning: 8,
+      cachedInput: 30,
+      total: 180
+    });
+    expect(timeline.taskJourneys[0].tokenUsage).toEqual(timeline.tokenUsage);
+  });
+
   it("builds task journeys from each user prompt boundary", () => {
     const lines = parseCodexJsonlContent(fixture("call-association-rollout.jsonl"), "call-association-rollout.jsonl");
     const bundle = normalizeCodexLines(lines, { repoRoot: "/tmp/superview-fixture" });

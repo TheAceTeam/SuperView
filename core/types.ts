@@ -8,6 +8,7 @@ export type EventKind =
   | "tool_call"
   | "tool_result"
   | "reasoning_marker"
+  | "token_usage"
   | "file_change"
   | "verification"
   | "error"

@@ -175,6 +175,7 @@ export class SuperViewDatabase {
         size_bytes INTEGER NOT NULL,
         sha256 TEXT,
         session_id TEXT,
+        processor_version TEXT,
         processed_at TEXT NOT NULL
       );
 
@@ -196,6 +197,7 @@ export class SuperViewDatabase {
     this.ensureColumn("events", "output_event_id", "TEXT");
     this.ensureColumn("events", "commit_hash", "TEXT");
     this.ensureColumn("events", "token_usage_json", "TEXT");
+    this.ensureColumn("ingested_files", "processor_version", "TEXT");
     this.db.prepare("INSERT OR REPLACE INTO schema_meta(version, updated_at) VALUES (?, ?)").run(SCHEMA_VERSION, new Date().toISOString());
   }
 
@@ -377,29 +379,30 @@ export class SuperViewDatabase {
       .run({ ...job, skippedFiles: job.skippedFiles ?? 0, errorsJson: JSON.stringify(job.errors) });
   }
 
-  getIngestedFile(path: string): { path: string; mtimeMs: number; sizeBytes: number; sha256: string | null; sessionId: string | null; processedAt: string } | null {
+  getIngestedFile(path: string): { path: string; mtimeMs: number; sizeBytes: number; sha256: string | null; sessionId: string | null; processorVersion: string | null; processedAt: string } | null {
     const row = this.db
       .prepare(
-        `SELECT path, mtime_ms as mtimeMs, size_bytes as sizeBytes, sha256, session_id as sessionId, processed_at as processedAt
+        `SELECT path, mtime_ms as mtimeMs, size_bytes as sizeBytes, sha256, session_id as sessionId, processor_version as processorVersion, processed_at as processedAt
          FROM ingested_files WHERE path = ?`
       )
-      .get(path) as { path: string; mtimeMs: number; sizeBytes: number; sha256: string | null; sessionId: string | null; processedAt: string } | undefined;
+      .get(path) as { path: string; mtimeMs: number; sizeBytes: number; sha256: string | null; sessionId: string | null; processorVersion: string | null; processedAt: string } | undefined;
     return row ?? null;
   }
 
-  upsertIngestedFile(file: { path: string; mtimeMs: number; sizeBytes: number; sha256?: string | null; sessionId?: string | null; processedAt: string }) {
+  upsertIngestedFile(file: { path: string; mtimeMs: number; sizeBytes: number; sha256?: string | null; sessionId?: string | null; processorVersion?: string | null; processedAt: string }) {
     this.db
       .prepare(
-        `INSERT INTO ingested_files(path, mtime_ms, size_bytes, sha256, session_id, processed_at)
-         VALUES (@path, @mtimeMs, @sizeBytes, @sha256, @sessionId, @processedAt)
+        `INSERT INTO ingested_files(path, mtime_ms, size_bytes, sha256, session_id, processor_version, processed_at)
+         VALUES (@path, @mtimeMs, @sizeBytes, @sha256, @sessionId, @processorVersion, @processedAt)
          ON CONFLICT(path) DO UPDATE SET
            mtime_ms=excluded.mtime_ms,
            size_bytes=excluded.size_bytes,
            sha256=excluded.sha256,
            session_id=excluded.session_id,
+           processor_version=excluded.processor_version,
            processed_at=excluded.processed_at`
       )
-      .run({ ...file, sha256: file.sha256 ?? null, sessionId: file.sessionId ?? null });
+      .run({ ...file, sha256: file.sha256 ?? null, sessionId: file.sessionId ?? null, processorVersion: file.processorVersion ?? null });
   }
 
   listProjects(): ProjectRecord[] {
