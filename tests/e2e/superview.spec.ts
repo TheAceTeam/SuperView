@@ -4,6 +4,14 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   let timelineRequestCount = 0;
   let evidenceRequested = false;
   const journeyDetailRequests: string[] = [];
+  const tokenUsageForTask = (taskOffset: number) => ({
+    input: 1000 + taskOffset,
+    output: 300 + Math.floor(taskOffset / 3),
+    reasoning: 120 + Math.floor(taskOffset / 5),
+    cachedInput: 250 + Math.floor(taskOffset / 4),
+    total: 1420 + taskOffset + Math.floor(taskOffset / 3) + Math.floor(taskOffset / 5)
+  });
+  const durationForEvents = (events: Array<{ timestamp: string }>) => Date.parse(events.at(-1)?.timestamp ?? events[0].timestamp) - Date.parse(events[0].timestamp);
 
   await page.route("**/api/projects", async (route) => {
     await route.fulfill({
@@ -103,6 +111,7 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
     const taskJourneySummaries = taskStarts.map((startIndex, taskIndex) => {
       const taskEvents = events.slice(startIndex, taskStarts[taskIndex + 1] ?? events.length);
       const prompt = taskEvents[0];
+      const tokenUsage = tokenUsageForTask(offset + startIndex);
       return {
         id: `task-${offset + startIndex}`,
         projectId: "project-fixture",
@@ -110,11 +119,13 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
         promptEventId: prompt.id,
         startedAt: prompt.timestamp,
         endedAt: taskEvents.at(-1)?.timestamp ?? prompt.timestamp,
+        durationMs: durationForEvents(taskEvents),
         title: `User task ${offset + startIndex}`,
         summary: `From user input through ${taskEvents.length} event(s), 3 stage(s), ending at session end.`,
         status: "success",
         exitType: "session_end",
         eventIds: taskEvents.map((event) => event.id),
+        tokenUsage,
         stageCounts: {
           Product: taskEvents.filter((event) => event.lane === "Product").length,
           Code: taskEvents.filter((event) => event.lane === "Code").length,
@@ -284,8 +295,10 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
       callId: index % 3 === 0 && index !== 0 ? `call-${offset + index}` : null,
       status: "success",
       files: [],
-      rawEventRefId: `detail-raw-${offset + index}`
+      rawEventRefId: `detail-raw-${offset + index}`,
+      tokenUsage: index === 1 ? tokenUsageForTask(offset) : null
     }));
+    const tokenUsage = tokenUsageForTask(offset);
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -296,11 +309,13 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
           promptEventId: events[0].id,
           startedAt: events[0].timestamp,
           endedAt: events.at(-1)?.timestamp ?? events[0].timestamp,
+          durationMs: durationForEvents(events),
           title: `User task ${offset}`,
           summary: `Loaded dynamic detail for task ${offset}.`,
           status: "success",
           exitType: "session_end",
           eventIds: events.map((event) => event.id),
+          tokenUsage,
           stageCounts: {
             Product: 1,
             Code: events.filter((event) => event.lane === "Code").length,
@@ -359,9 +374,15 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await expect(page.getByLabel("Project")).toBeVisible();
   await expect(page.locator(".title-actions").getByText("Tokens")).toBeVisible();
   await expect(page.locator(".title-actions").getByText("6,414")).toBeVisible();
+  await expect(page.locator(".title-actions").getByText("KV hit")).toBeVisible();
+  await expect(page.locator(".title-actions").getByText("21.1%")).toBeVisible();
   await expect(page.getByText("User", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Codex CLI", { exact: true }).first()).toBeVisible();
   await expect(page.locator(".conversation-turn").first().getByText("Build task journey from input 0")).toBeVisible();
+  await expect(page.locator(".conversation-turn").first().getByText("1m 14s")).toBeVisible();
+  await expect(page.locator(".conversation-turn").first().getByText("1,420 tokens")).toBeVisible();
+  await expect(page.locator(".conversation-turn").first().getByText("KV hit 25.0%")).toBeVisible();
+  await expect(page.locator(".conversation-turn").first().locator(".message-row.user").getByText("Build task journey from input 0")).toHaveCount(1);
   await expect(page.locator(".conversation-turn")).toHaveCount(4);
   await expect(page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 75" })).toBeVisible();
   await expect(page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 150" })).toBeVisible();
@@ -379,34 +400,35 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-0").length).toBe(1);
   await expect(journeyDetailRequests).not.toContain("task-225");
   await expect(journeyDetailRequests).not.toContain("task-225");
-  await page.locator(".conversation-turn").filter({ hasText: "User task 225" }).getByRole("button", { name: /Agent work.*查看过程\.\.\./ }).click();
+  await page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 225" }).getByRole("button", { name: /Agent work.*查看过程\.\.\./ }).click();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-225").length).toBe(1);
   await expect(page.locator(".conversation-turn").filter({ hasText: "Codex completed task 225 in CLI output." })).toBeVisible();
-  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(page.getByRole("button", { name: "Show causal paths" })).toHaveCount(0);
+  await expect(page.getByText("Causal path", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Causal Links" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Next page" }).click();
   await expect(page.getByText("301-340 of 340")).toBeVisible();
   await expect(page.locator(".conversation-turn")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Prev page" })).toBeEnabled();
   await expect(journeyDetailRequests).not.toContain("task-300");
-  await page.locator(".conversation-turn").filter({ hasText: "User task 300" }).getByRole("button", { name: /Agent work.*查看过程\.\.\./ }).click();
+  await page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 300" }).getByRole("button", { name: /Agent work.*查看过程\.\.\./ }).click();
   await expect.poll(() => journeyDetailRequests.filter((id) => id === "task-300").length).toBe(1);
   await expect(page.getByText("Codex completed task 300 in CLI output.")).toBeVisible();
-  const task300CodexBody = page.locator(".conversation-turn").filter({ hasText: "User task 300" }).locator(".message-row.codex .message-body");
+  const task300CodexBody = page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 300" }).locator(".message-row.codex .message-body");
   await expect(task300CodexBody).toHaveAttribute("data-expanded", "false");
   await expect.poll(async () => Math.round((await task300CodexBody.boundingBox())?.height ?? 0)).toBeLessThanOrEqual(250);
-  await page.locator(".conversation-turn").filter({ hasText: "User task 300" }).locator(".message-expand-toggle").filter({ hasText: "展开" }).click();
+  await page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 300" }).locator(".message-expand-toggle").filter({ hasText: "展开" }).click();
   await expect(task300CodexBody).toHaveAttribute("data-expanded", "true");
   await expect.poll(async () => Math.round((await task300CodexBody.boundingBox())?.height ?? 0)).toBeGreaterThan(250);
-  await page.locator(".conversation-turn").filter({ hasText: "User task 300" }).locator(".message-expand-toggle").filter({ hasText: "收起" }).click();
+  await page.locator(".conversation-turn").filter({ hasText: "Build task journey from input 300" }).locator(".message-expand-toggle").filter({ hasText: "收起" }).click();
   await expect(task300CodexBody).toHaveAttribute("data-expanded", "false");
   await expect(page.getByText("Background Work", { exact: true })).toBeVisible();
   await expect(page.getByText("Log", { exact: true })).toBeVisible();
   await expect(page.getByText("Loaded task detail 302")).toBeVisible();
   await expect(page.getByRole("button", { name: /Agent work.*收起过程\.\.\./ })).toBeVisible();
-  await page.getByRole("button", { name: "Show causal paths" }).click();
-  await expect(page.getByLabel("Causal path")).toBeVisible();
   await page.getByRole("button", { name: /Codex CLI.*Codex completed task 300/ }).click({ force: true });
-  await expect(page.getByText(/causal links on this page/)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Causal Links" })).toBeVisible();
-  await expect(page.getByText("verified by").first()).toBeVisible();
+  await expect(page.getByText(/causal links on this page/)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Causal Links" })).toHaveCount(0);
   await expect(page.getByText("redacted command output")).toBeVisible();
   await expect(page.getByText("{\"token\":\"[REDACTED]\"}")).toBeVisible();
   expect(evidenceRequested).toBe(true);

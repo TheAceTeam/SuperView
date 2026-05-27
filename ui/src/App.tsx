@@ -1,6 +1,6 @@
-import { AlertTriangle, FileText, GitBranch, Moon, RotateCw, Search, Sun } from "lucide-react";
+import { AlertTriangle, FileText, Moon, RotateCw, Search, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Artifact, CausalEdge, EventEvidence, IngestJob, ProjectTimeline, TaskJourney, TaskJourneyDetail, TimelineEvent } from "../../core/types";
+import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, TaskJourney, TaskJourneyDetail, TimelineEvent, TokenUsage } from "../../core/types";
 import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
@@ -22,7 +22,6 @@ export function App() {
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [job, setJob] = useState<IngestJob | null>(null);
   const [codexHome, setCodexHome] = useState("");
-  const [showCausalPaths, setShowCausalPaths] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,22 +155,17 @@ export function App() {
 
   const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
   const journeys = timeline?.taskJourneys ?? [];
-  const selectedJourneyDetails = useMemo(() => journeys.map((journey) => journeyDetails[journey.id]).filter((detail): detail is TaskJourneyDetail => Boolean(detail)), [journeys, journeyDetails]);
   const timelineEventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
-  const detailEvents = useMemo(() => selectedJourneyDetails.flatMap((detail) => detail.events), [selectedJourneyDetails]);
-  const eventsById = useMemo(() => mergeEventMaps(timelineEventsById, detailEvents), [timelineEventsById, detailEvents]);
 
   const drawerEvent = selectedEvent;
   const drawerEvidence = eventEvidence?.event.id === drawerEvent?.id ? eventEvidence : null;
   const drawerArtifacts = drawerEvidence?.artifacts ?? [];
-  const drawerEvents = useMemo(() => mergeEvents(timeline?.events ?? [], detailEvents), [timeline, detailEvents]);
-  const causalEdges = useMemo(() => [...(timeline?.causalEdges ?? []), ...selectedJourneyDetails.flatMap((detail) => detail.causalEdges)], [timeline, selectedJourneyDetails]);
-  const causalView = useMemo(() => buildCausalView(drawerEvents, causalEdges, drawerEvent?.id ?? null), [drawerEvents, causalEdges, drawerEvent?.id]);
   const totalEvents = timeline?.totalEvents ?? timeline?.events.length ?? 0;
   const currentLimit = timeline?.limit ?? TIMELINE_LIMIT;
   const pageEnd = Math.min(timelineOffset + (timeline?.events.length ?? 0), totalEvents);
   const hasPreviousPage = timelineOffset > 0;
   const hasNextPage = totalEvents > timelineOffset + currentLimit;
+  const projectTokenUsage = timeline?.tokenUsage ?? ZERO_TOKEN_USAGE;
 
   return (
     <div className="app-shell">
@@ -220,10 +214,8 @@ export function App() {
               <Metric label="Projects" value={projects.length} />
               <Metric label="Events" value={totalEvents} />
               <Metric label="Tasks" value={timeline?.taskJourneys.length ?? 0} />
-              <Metric label="Tokens" value={timeline?.tokenUsage.total ?? 0} />
-              <Metric label="Input" value={timeline?.tokenUsage.input ?? 0} />
-              <Metric label="Output" value={timeline?.tokenUsage.output ?? 0} />
-              <Metric label="Reasoning" value={timeline?.tokenUsage.reasoning ?? 0} />
+              <Metric label="Tokens" value={projectTokenUsage.total} />
+              <RatioMetric label="KV hit" value={formatKvHitRate(projectTokenUsage)} />
             </div>
           </div>
         </section>
@@ -246,15 +238,10 @@ export function App() {
               <div className="timeline-controls">
                 <span>{timeline?.taskJourneys.length ?? 0} task journeys loaded from {timeline?.events.length ?? 0} events</span>
                 <div>
-                  <button className={`secondary-button ${showCausalPaths ? "active" : ""}`} onClick={() => setShowCausalPaths((current) => !current)}>
-                    <GitBranch size={15} />
-                    {showCausalPaths ? "Hide causal paths" : "Show causal paths"}
-                  </button>
-                  <button className="secondary-button" onClick={loadPreviousTimelinePage} disabled={!hasPreviousPage || timelineLoading}>Previous</button>
-                  <button className="secondary-button" onClick={loadNextTimelinePage} disabled={!hasNextPage || timelineLoading}>Load more</button>
+                  <button className="secondary-button" onClick={loadPreviousTimelinePage} disabled={!hasPreviousPage || timelineLoading}>Prev page</button>
+                  <button className="secondary-button" onClick={loadNextTimelinePage} disabled={!hasNextPage || timelineLoading}>Next page</button>
                 </div>
               </div>
-              {showCausalPaths ? <CausalRibbon view={causalView} /> : null}
               <ConversationThread
                 journeys={journeys}
                 detailsByJourneyId={journeyDetails}
@@ -262,8 +249,6 @@ export function App() {
                 expandedJourneyIds={expandedJourneyIds}
                 loadingJourneyIds={journeyLoadingIds}
                 selectedEventId={drawerEvent?.id ?? null}
-                causalView={causalView}
-                showCausalPaths={showCausalPaths}
                 onToggleDetails={toggleJourneyDetails}
                 onSelectEvent={(event) => {
                   setSelectedEvent(event);
@@ -271,7 +256,7 @@ export function App() {
               />
             </section>
 
-            <EvidenceDrawer event={drawerEvent ?? null} artifacts={drawerArtifacts} rawEvent={drawerEvidence?.rawEvent ?? null} loading={evidenceLoading} causalEdges={causalView.directEdges} events={drawerEvents} />
+            <EvidenceDrawer event={drawerEvent ?? null} artifacts={drawerArtifacts} rawEvent={drawerEvidence?.rawEvent ?? null} loading={evidenceLoading} />
           </div>
         )}
       </main>
@@ -279,108 +264,10 @@ export function App() {
   );
 }
 
-interface CausalView {
-  selectedId: string | null;
-  upstream: Set<string>;
-  downstream: Set<string>;
-  context: Set<string>;
-  directEdges: CausalEdge[];
-  chainEdges: CausalEdge[];
-  chainEvents: TimelineEvent[];
-}
-
-function buildCausalView(events: TimelineEvent[], edges: CausalEdge[], selectedId: string | null): CausalView {
-  const eventsById = new Map(events.map((event) => [event.id, event]));
-  const visibleEdges = edges.filter((edge) => edge.type !== "same_turn" && eventsById.has(edge.fromEventId) && eventsById.has(edge.toEventId));
-  const directEdges = selectedId ? edges.filter((edge) => edge.fromEventId === selectedId || edge.toEventId === selectedId) : [];
-  const upstream = new Set<string>();
-  const downstream = new Set<string>();
-  const context = new Set<string>();
-  if (!selectedId || !eventsById.has(selectedId)) {
-    return { selectedId, upstream, downstream, context, directEdges: [], chainEdges: [], chainEvents: [] };
-  }
-
-  for (const edge of directEdges) {
-    if (edge.type === "same_turn") {
-      context.add(edge.fromEventId === selectedId ? edge.toEventId : edge.fromEventId);
-    }
-  }
-
-  walkGraph(selectedId, visibleEdges, "upstream", upstream);
-  walkGraph(selectedId, visibleEdges, "downstream", downstream);
-  const chainIds = new Set([selectedId, ...upstream, ...downstream]);
-  const chainEdges = visibleEdges.filter((edge) => chainIds.has(edge.fromEventId) && chainIds.has(edge.toEventId));
-  const chainEvents = events.filter((event) => chainIds.has(event.id)).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  return { selectedId, upstream, downstream, context, directEdges, chainEdges, chainEvents };
-}
-
-function walkGraph(seedId: string, edges: CausalEdge[], direction: "upstream" | "downstream", visited: Set<string>) {
-  const queue = [seedId];
-  while (queue.length > 0 && visited.size < 40) {
-    const current = queue.shift();
-    if (!current) break;
-    const nextIds = edges
-      .filter((edge) => (direction === "upstream" ? edge.toEventId === current : edge.fromEventId === current))
-      .map((edge) => (direction === "upstream" ? edge.fromEventId : edge.toEventId));
-    for (const nextId of nextIds) {
-      if (visited.has(nextId) || nextId === seedId) continue;
-      visited.add(nextId);
-      queue.push(nextId);
-    }
-  }
-}
-
-function mergeEvents(...eventGroups: TimelineEvent[][]): TimelineEvent[] {
-  const eventsById = new Map<string, TimelineEvent>();
-  for (const group of eventGroups) {
-    for (const event of group) eventsById.set(event.id, event);
-  }
-  return [...eventsById.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-}
-
-function mergeEventMaps(primary: Map<string, TimelineEvent>, secondary: TimelineEvent[]): Map<string, TimelineEvent> {
-  const eventsById = new Map(primary);
-  for (const event of secondary) eventsById.set(event.id, event);
-  return eventsById;
-}
-
-function eventItemClass(event: TimelineEvent, selectedId: string | null, causalView: CausalView, showCausalPaths: boolean) {
+function eventItemClass(event: TimelineEvent, selectedId: string | null) {
   const classes = ["log-entry", event.status];
   if (event.id === selectedId) classes.push("selected");
-  if (showCausalPaths && selectedId) {
-    if (causalView.upstream.has(event.id)) classes.push("causal-upstream");
-    if (causalView.downstream.has(event.id)) classes.push("causal-downstream");
-    if (causalView.context.has(event.id)) classes.push("causal-context");
-    const isRelated = event.id === selectedId || causalView.upstream.has(event.id) || causalView.downstream.has(event.id) || causalView.context.has(event.id);
-    if (!isRelated) classes.push("dimmed");
-  }
   return classes.join(" ");
-}
-
-function CausalRibbon({ view }: { view: CausalView }) {
-  if (!view.selectedId) return null;
-  return (
-    <section className="causal-ribbon" aria-label="Causal path">
-      <div className="causal-ribbon-heading">
-        <GitBranch size={15} />
-        <span>Causal path</span>
-        <small>{view.chainEdges.length} causal links on this page</small>
-      </div>
-      {view.chainEvents.length > 1 ? (
-        <div className="causal-chain">
-          {view.chainEvents.map((event, index) => (
-            <span className="causal-chain-item" data-role={event.id === view.selectedId ? "selected" : view.upstream.has(event.id) ? "upstream" : "downstream"} key={event.id}>
-              <b>{formatEventKind(event.kind)}</b>
-              <em>{shortLabel(event.title)}</em>
-              {index < view.chainEvents.length - 1 ? <i aria-hidden="true">&gt;</i> : null}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="muted">No strong causal link is visible on the current timeline page. Same-turn context still appears in the Evidence panel.</p>
-      )}
-    </section>
-  );
 }
 
 function ConversationThread({
@@ -390,8 +277,6 @@ function ConversationThread({
   expandedJourneyIds,
   loadingJourneyIds,
   selectedEventId,
-  causalView,
-  showCausalPaths,
   onToggleDetails,
   onSelectEvent
 }: {
@@ -401,8 +286,6 @@ function ConversationThread({
   expandedJourneyIds: Record<string, boolean>;
   loadingJourneyIds: Record<string, boolean>;
   selectedEventId: string | null;
-  causalView: CausalView;
-  showCausalPaths: boolean;
   onToggleDetails: (journeyId: string) => void;
   onSelectEvent: (event: TimelineEvent) => void;
 }) {
@@ -421,8 +304,6 @@ function ConversationThread({
           expanded={Boolean(expandedJourneyIds[journey.id])}
           loading={Boolean(loadingJourneyIds[journey.id])}
           selectedEventId={selectedEventId}
-          causalView={causalView}
-          showCausalPaths={showCausalPaths}
           onToggleDetails={() => onToggleDetails(journey.id)}
           onSelectEvent={onSelectEvent}
         />
@@ -438,8 +319,6 @@ function ConversationTurn({
   expanded,
   loading,
   selectedEventId,
-  causalView,
-  showCausalPaths,
   onToggleDetails,
   onSelectEvent
 }: {
@@ -449,8 +328,6 @@ function ConversationTurn({
   expanded: boolean;
   loading: boolean;
   selectedEventId: string | null;
-  causalView: CausalView;
-  showCausalPaths: boolean;
   onToggleDetails: () => void;
   onSelectEvent: (event: TimelineEvent) => void;
 }) {
@@ -465,11 +342,12 @@ function ConversationTurn({
   return (
     <article className={`conversation-turn ${journey.status}`}>
       <div className="conversation-summary">
-        <strong>{journey.title}</strong>
         <div>
           <span>{journey.eventIds.length} events</span>
           <span>{formatExitType(journey.exitType)}</span>
-          <span>{formatDate(journey.startedAt)} - {formatDate(journey.endedAt)}</span>
+          <span>{formatDuration(journey.durationMs)}</span>
+          <span>{journey.tokenUsage.total.toLocaleString()} tokens</span>
+          <span>KV hit {formatKvHitRate(journey.tokenUsage)}</span>
           {loading ? <span>Loading details</span> : null}
         </div>
       </div>
@@ -477,7 +355,6 @@ function ConversationTurn({
       <ChatBubble
         variant="user"
         label="User"
-        title={journey.title}
         text={promptText}
         selected={prompt?.id === selectedEventId}
         disabled={!prompt}
@@ -504,7 +381,7 @@ function ConversationTurn({
             <div className="log-list">
               {backgroundEvents.length > 0 ? (
                 backgroundEvents.map((event) => (
-                  <button key={event.id} className={eventItemClass(event, selectedEventId, causalView, showCausalPaths)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
+                  <button key={event.id} className={eventItemClass(event, selectedEventId)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
                     <span>{event.kind}</span>
                     <strong>{event.title}</strong>
                     <small>{event.detail ?? formatDate(event.timestamp)}</small>
@@ -524,7 +401,7 @@ function ConversationTurn({
             <div className="log-list compact">
               {logEvents.length > 0 ? (
                 logEvents.map((event) => (
-                  <button key={event.id} className={eventItemClass(event, selectedEventId, causalView, showCausalPaths)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
+                  <button key={event.id} className={eventItemClass(event, selectedEventId)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
                     <span>{event.toolName ?? event.kind}</span>
                     <strong>{event.title}</strong>
                     <small>{event.detail ?? event.callId ?? formatDate(event.timestamp)}</small>
@@ -624,6 +501,15 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
+function RatioMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function EmptyState({
   title,
   detail,
@@ -667,18 +553,13 @@ function EvidenceDrawer({
   event,
   artifacts,
   rawEvent,
-  loading,
-  causalEdges,
-  events
+  loading
 }: {
   event: TimelineEvent | null;
   artifacts: Artifact[];
   rawEvent: EventEvidence["rawEvent"];
   loading: boolean;
-  causalEdges: CausalEdge[];
-  events: TimelineEvent[];
 }) {
-  const eventsById = useMemo(() => new Map(events.map((timelineEvent) => [timelineEvent.id, timelineEvent])), [events]);
   return (
     <aside className="evidence-drawer">
       <div className="panel-heading">
@@ -699,24 +580,6 @@ function EvidenceDrawer({
             {event.callId ? <><dt>Call</dt><dd>{event.callId}</dd></> : null}
           </dl>
           <pre>{event.detail ?? "No detail captured."}</pre>
-          <h3>Causal Links</h3>
-          {causalEdges.length > 0 ? (
-            <div className="causal-edge-list">
-              {causalEdges.map((edge) => {
-                const isOutgoing = edge.fromEventId === event.id;
-                const otherEvent = eventsById.get(isOutgoing ? edge.toEventId : edge.fromEventId);
-                return (
-                  <div className={`causal-edge ${edge.confidence}`} key={edge.id}>
-                    <strong>{formatCausalType(edge.type)}</strong>
-                    <small>{isOutgoing ? "Leads to" : "Comes from"}: {otherEvent?.title ?? (isOutgoing ? edge.toEventId : edge.fromEventId)}</small>
-                    <p>{edge.reason}</p>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="muted">No causal links are visible for this event on the current page.</p>
-          )}
           <h3>Artifacts</h3>
           {artifacts.length > 0 ? (
             artifacts.map((artifact) => (
@@ -747,10 +610,6 @@ function EvidenceDrawer({
   );
 }
 
-function formatCausalType(type: CausalEdge["type"]) {
-  return type.replace(/_/g, " ");
-}
-
 function formatEventKind(kind: TimelineEvent["kind"]) {
   return kind.replace(/_/g, " ");
 }
@@ -761,6 +620,18 @@ function formatDate(value: string) {
   return date.toLocaleString();
 }
 
-function shortLabel(value: string) {
-  return value.length > 24 ? `${value.slice(0, 21)}...` : value;
+function formatDuration(durationMs: number) {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  const seconds = durationMs / 1000;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
 }
+
+function formatKvHitRate(usage: TokenUsage) {
+  if (usage.input <= 0) return "0.0%";
+  return `${((usage.cachedInput / usage.input) * 100).toFixed(1)}%`;
+}
+
+const ZERO_TOKEN_USAGE: TokenUsage = { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 };

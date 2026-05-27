@@ -432,90 +432,6 @@ select {
   font-size: 13px;
 }
 
-.causal-ribbon {
-  margin: 0 0 16px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--orange) 40%, var(--line));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--orange-soft) 70%, var(--surface-2));
-}
-
-.causal-ribbon-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  color: var(--orange);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-.causal-ribbon-heading small {
-  margin-left: auto;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.causal-chain {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.causal-chain-item {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 260px;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--ink);
-  font-size: 12px;
-}
-
-.causal-chain-item b {
-  color: var(--orange);
-}
-
-.causal-chain-item em {
-  overflow: hidden;
-  color: var(--muted);
-  font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.causal-chain-item i {
-  color: var(--orange);
-  font-style: normal;
-  font-weight: 900;
-}
-
-.causal-chain-item[data-role="selected"] {
-  border-color: var(--orange);
-  background: var(--orange);
-  color: #fff;
-}
-
-.causal-chain-item[data-role="selected"] b,
-.causal-chain-item[data-role="selected"] em,
-.causal-chain-item[data-role="selected"] i {
-  color: #fff;
-}
-
-.causal-chain-item[data-role="upstream"] {
-  border-color: color-mix(in srgb, var(--blue) 55%, var(--line));
-}
-
-.causal-chain-item[data-role="downstream"] {
-  border-color: color-mix(in srgb, var(--success) 55%, var(--line));
-}
-
 .conversation-thread {
   display: grid;
   gap: 20px;
@@ -542,11 +458,6 @@ select {
 .conversation-summary {
   display: grid;
   gap: 8px;
-}
-
-.conversation-summary strong {
-  overflow-wrap: anywhere;
-  font-size: 16px;
 }
 
 .conversation-summary div {
@@ -732,8 +643,9 @@ select {
 
 .detail-toggle {
   width: auto;
-  min-height: 40px;
-  padding: 10px 13px;
+  min-height: 34px;
+  padding: 8px 11px;
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -825,25 +737,6 @@ select {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 20%, transparent);
 }
 
-.log-entry.causal-upstream {
-  border-color: var(--blue);
-  background: var(--blue-soft);
-}
-
-.log-entry.causal-downstream {
-  border-color: var(--success);
-  background: #dcfce7;
-  color: #016630;
-}
-
-.log-entry.causal-context {
-  border-style: dashed;
-}
-
-.log-entry.dimmed {
-  opacity: .42;
-}
-
 .evidence-drawer h2 {
   margin-bottom: 12px;
   font-size: 19px;
@@ -915,43 +808,6 @@ pre {
   display: block;
   color: var(--muted);
   overflow-wrap: anywhere;
-}
-
-.causal-edge-list {
-  display: grid;
-  gap: 8px;
-}
-
-.causal-edge {
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--orange);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.causal-edge.inferred {
-  border-left-color: var(--blue);
-}
-
-.causal-edge strong {
-  display: block;
-  color: var(--ink);
-  font-size: 13px;
-  text-transform: capitalize;
-}
-
-.causal-edge small {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.causal-edge p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .muted {
