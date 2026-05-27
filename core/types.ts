@@ -167,11 +167,13 @@ export interface TaskJourney {
   promptEventId: string;
   startedAt: string;
   endedAt: string;
+  durationMs: number;
   title: string;
   summary: string;
   status: EventStatus;
   exitType: TaskJourneyExitType;
   eventIds: string[];
+  tokenUsage: TokenUsage;
   stageCounts: Partial<Record<TimelineLane, number>>;
   stages: TaskJourneyStage[];
 }

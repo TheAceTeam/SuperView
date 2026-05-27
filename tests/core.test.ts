@@ -81,6 +81,16 @@ describe("Codex parser and normalizer", () => {
       cachedInput: 42,
       total: 180
     });
+    expect(timeline.taskJourneys[0]).toMatchObject({
+      durationMs: 1500,
+      tokenUsage: {
+        input: 125,
+        output: 37,
+        reasoning: 10,
+        cachedInput: 42,
+        total: 180
+      }
+    });
   });
 
   it("builds task journeys from each user prompt boundary", () => {

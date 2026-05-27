@@ -18,18 +18,20 @@ export function buildProjectTimeline(project: ProjectRecord, events: TimelineEve
 }
 
 export function aggregateTokenUsage(projectId: string, events: TimelineEvent[]): TokenUsage {
-  return events
-    .filter((event) => event.projectId === projectId)
-    .reduce<TokenUsage>(
-      (total, event) => ({
-        input: total.input + (event.tokenUsage?.input ?? 0),
-        output: total.output + (event.tokenUsage?.output ?? 0),
-        reasoning: total.reasoning + (event.tokenUsage?.reasoning ?? 0),
-        cachedInput: total.cachedInput + (event.tokenUsage?.cachedInput ?? 0),
-        total: total.total + (event.tokenUsage?.total ?? 0)
-      }),
-      { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 }
-    );
+  return aggregateEventTokenUsage(events.filter((event) => event.projectId === projectId));
+}
+
+function aggregateEventTokenUsage(events: TimelineEvent[]): TokenUsage {
+  return events.reduce<TokenUsage>(
+    (total, event) => ({
+      input: total.input + (event.tokenUsage?.input ?? 0),
+      output: total.output + (event.tokenUsage?.output ?? 0),
+      reasoning: total.reasoning + (event.tokenUsage?.reasoning ?? 0),
+      cachedInput: total.cachedInput + (event.tokenUsage?.cachedInput ?? 0),
+      total: total.total + (event.tokenUsage?.total ?? 0)
+    }),
+    { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 }
+  );
 }
 
 export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): TaskJourney[] {
@@ -60,15 +62,24 @@ export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): T
       promptEventId: prompt.id,
       startedAt: prompt.timestamp,
       endedAt: end.timestamp,
+      durationMs: durationBetween(prompt.timestamp, end.timestamp),
       title: prompt.title,
       summary: `From user input through ${journeyEvents.length} event(s), ${stages.length} stage(s), ending at ${nextPrompt ? "next user input" : "session end"}.`,
       status,
       exitType: nextPrompt ? "next_prompt" : "session_end",
       eventIds: journeyEvents.map((event) => event.id),
+      tokenUsage: aggregateEventTokenUsage(journeyEvents),
       stageCounts,
       stages
     };
   });
+}
+
+function durationBetween(start: string, end: string): number {
+  const startMs = Date.parse(start);
+  const endMs = Date.parse(end);
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return 0;
+  return Math.max(0, endMs - startMs);
 }
 
 function buildTaskJourneyStages(events: TimelineEvent[]): TaskJourneyStage[] {
