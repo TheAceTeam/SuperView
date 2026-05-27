@@ -1,4 +1,4 @@
-import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, RunReplay, SessionRecord, TaskJourneyDetail, TokenUsage } from "../../core/types";
+import type { AgentSourceConfig, Artifact, EventEvidence, IngestJob, ProjectTimeline, RunReplay, SessionRecord, TaskJourneyDetail, TokenUsage } from "../../core/types";
 
 export interface ProjectWithSessions {
   id: string;
@@ -18,11 +18,11 @@ export async function fetchProjects(): Promise<ProjectWithSessions[]> {
   return data.projects;
 }
 
-export async function startIngest(codexHome?: string): Promise<string> {
+export async function startIngest(options: { codexHome?: string; sources?: AgentSourceConfig[] } = {}): Promise<string> {
   const response = await fetch("/api/ingest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(codexHome ? { codexHome } : {})
+    body: JSON.stringify(options)
   });
   if (!response.ok) throw new Error("Failed to start ingest");
   const data = (await response.json()) as { jobId: string };

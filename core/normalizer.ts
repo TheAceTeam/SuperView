@@ -1,6 +1,7 @@
 import path from "node:path";
 import {
   Artifact,
+  AgentProvider,
   NormalizedBundle,
   ParsedCodexLine,
   ProjectRecord,
@@ -18,6 +19,11 @@ import { stableId } from "./id";
 
 interface NormalizeOptions {
   repoRoot?: string | null;
+  provider?: AgentProvider;
+  prefixSessionId?: boolean;
+  modelProvider?: string | null;
+  source?: string | null;
+  agentName?: string | null;
 }
 
 export function normalizeCodexLines(lines: ParsedCodexLine[], options: NormalizeOptions = {}): NormalizedBundle | null {
@@ -27,7 +33,9 @@ export function normalizeCodexLines(lines: ParsedCodexLine[], options: Normalize
 
   const sessionMeta = lines.find((line) => line.type === "session_meta");
   const metaPayload = asRecord(sessionMeta?.payload);
-  const sessionId = stringValue(metaPayload.id) ?? stableId("session", lines[0]?.sourcePath ?? "unknown");
+  const provider = options.provider ?? "codex";
+  const externalSessionId = stringValue(metaPayload.id) ?? stableId("session", lines[0]?.sourcePath ?? "unknown");
+  const sessionId = options.prefixSessionId ? `${provider}:${externalSessionId}` : externalSessionId;
   const cwd = stringValue(metaPayload.cwd) ?? process.cwd();
   const startedAt = stringValue(metaPayload.timestamp) ?? sessionMeta?.timestamp ?? lines[0]?.timestamp ?? new Date().toISOString();
   const repoRoot = options.repoRoot ?? null;
@@ -50,13 +58,17 @@ export function normalizeCodexLines(lines: ParsedCodexLine[], options: Normalize
     startedAt,
     endedAt: lines.at(-1)?.timestamp ?? null,
     cliVersion: stringValue(metaPayload.cli_version),
-    modelProvider: stringValue(metaPayload.model_provider),
-    source: stringValue(metaPayload.source)
+    modelProvider: options.modelProvider ?? stringValue(metaPayload.model_provider),
+    source: options.source ?? stringValue(metaPayload.source),
+    provider,
+    externalSessionId,
+    agentName: options.agentName ?? null
   };
 
   const rawEventRefs: RawEventRef[] = lines.map((line) => ({
     id: stableId("raw", sessionId, line.lineNo, line.sha256),
     sessionId,
+    provider,
     lineNo: line.lineNo,
     timestamp: line.timestamp,
     type: line.type,

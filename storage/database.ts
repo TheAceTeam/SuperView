@@ -73,6 +73,9 @@ export class SuperViewDatabase {
         cli_version TEXT,
         model_provider TEXT,
         source TEXT,
+        provider TEXT NOT NULL DEFAULT 'codex',
+        external_session_id TEXT,
+        agent_name TEXT,
         FOREIGN KEY(project_id) REFERENCES projects(id)
       );
 
@@ -91,6 +94,7 @@ export class SuperViewDatabase {
       CREATE TABLE IF NOT EXISTS raw_event_refs (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
+        provider TEXT NOT NULL DEFAULT 'codex',
         line_no INTEGER NOT NULL,
         timestamp TEXT NOT NULL,
         type TEXT NOT NULL,
@@ -218,6 +222,10 @@ export class SuperViewDatabase {
     this.ensureColumn("events", "token_usage_json", "TEXT");
     this.ensureColumn("events", "skills_json", "TEXT");
     this.ensureColumn("ingested_files", "processor_version", "TEXT");
+    this.ensureColumn("sessions", "provider", "TEXT NOT NULL DEFAULT 'codex'");
+    this.ensureColumn("sessions", "external_session_id", "TEXT");
+    this.ensureColumn("sessions", "agent_name", "TEXT");
+    this.ensureColumn("raw_event_refs", "provider", "TEXT NOT NULL DEFAULT 'codex'");
     this.db.prepare("INSERT OR REPLACE INTO schema_meta(version, updated_at) VALUES (?, ?)").run(SCHEMA_VERSION, new Date().toISOString());
   }
 
@@ -261,8 +269,8 @@ export class SuperViewDatabase {
   upsertSession(session: SessionRecord) {
     this.db
       .prepare(
-        `INSERT INTO sessions(id, project_id, path, cwd, started_at, ended_at, cli_version, model_provider, source)
-         VALUES (@id, @projectId, @path, @cwd, @startedAt, @endedAt, @cliVersion, @modelProvider, @source)
+        `INSERT INTO sessions(id, project_id, path, cwd, started_at, ended_at, cli_version, model_provider, source, provider, external_session_id, agent_name)
+         VALUES (@id, @projectId, @path, @cwd, @startedAt, @endedAt, @cliVersion, @modelProvider, @source, @provider, @externalSessionId, @agentName)
          ON CONFLICT(id) DO UPDATE SET
            project_id=excluded.project_id,
            path=excluded.path,
@@ -270,7 +278,10 @@ export class SuperViewDatabase {
            ended_at=excluded.ended_at,
            cli_version=excluded.cli_version,
            model_provider=excluded.model_provider,
-           source=excluded.source`
+           source=excluded.source,
+           provider=excluded.provider,
+           external_session_id=excluded.external_session_id,
+           agent_name=excluded.agent_name`
       )
       .run(session);
   }
@@ -293,8 +304,8 @@ export class SuperViewDatabase {
   upsertRawEvent(raw: RawEventRef) {
     this.db
       .prepare(
-        `INSERT OR REPLACE INTO raw_event_refs(id, session_id, line_no, timestamp, type, redacted_payload_json, source_path, sha256)
-         VALUES (@id, @sessionId, @lineNo, @timestamp, @type, @redactedPayloadJson, @sourcePath, @sha256)`
+        `INSERT OR REPLACE INTO raw_event_refs(id, session_id, provider, line_no, timestamp, type, redacted_payload_json, source_path, sha256)
+         VALUES (@id, @sessionId, @provider, @lineNo, @timestamp, @type, @redactedPayloadJson, @sourcePath, @sha256)`
       )
       .run(raw);
   }
@@ -353,7 +364,9 @@ export class SuperViewDatabase {
       rawEventRefId: null,
       durationMs: null,
       outputEventId: null,
-      commitHash: commit.hash
+      commitHash: commit.hash,
+      tokenUsage: null,
+      skills: []
     });
   }
 
@@ -554,7 +567,8 @@ export class SuperViewDatabase {
 
   listSessions(projectId?: string): SessionRecord[] {
     const sql = `SELECT id, project_id as projectId, path, cwd, started_at as startedAt, ended_at as endedAt,
-                        cli_version as cliVersion, model_provider as modelProvider, source
+                        cli_version as cliVersion, model_provider as modelProvider, source, provider,
+                        COALESCE(external_session_id, id) as externalSessionId, agent_name as agentName
                  FROM sessions ${projectId ? "WHERE project_id = ?" : ""} ORDER BY started_at DESC`;
     return (projectId ? this.db.prepare(sql).all(projectId) : this.db.prepare(sql).all()) as SessionRecord[];
   }
@@ -564,7 +578,8 @@ export class SuperViewDatabase {
       (this.db
         .prepare(
           `SELECT id, project_id as projectId, path, cwd, started_at as startedAt, ended_at as endedAt,
-                  cli_version as cliVersion, model_provider as modelProvider, source
+                  cli_version as cliVersion, model_provider as modelProvider, source, provider,
+                  COALESCE(external_session_id, id) as externalSessionId, agent_name as agentName
            FROM sessions WHERE id = ?`
         )
         .get(sessionId) as SessionRecord | undefined) ?? null
@@ -621,7 +636,7 @@ export class SuperViewDatabase {
   getRawEvent(rawEventRefId: string): RawEventRef | null {
     const row = this.db
       .prepare(
-        `SELECT id, session_id as sessionId, line_no as lineNo, timestamp, type, redacted_payload_json as redactedPayloadJson,
+        `SELECT id, session_id as sessionId, provider, line_no as lineNo, timestamp, type, redacted_payload_json as redactedPayloadJson,
                 source_path as sourcePath, sha256
          FROM raw_event_refs WHERE id = ?`
       )

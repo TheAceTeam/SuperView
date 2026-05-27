@@ -14,3 +14,7 @@ export function resolveDatabasePath(): string {
 export function resolveCodexHome(): string {
   return process.env.SUPERVIEW_CODEX_HOME ?? path.join(process.env.HOME ?? process.cwd(), ".codex");
 }
+
+export function resolveClaudeHome(): string {
+  return process.env.SUPERVIEW_CLAUDE_HOME ?? path.join(process.env.HOME ?? process.cwd(), ".claude");
+}

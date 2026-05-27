@@ -100,16 +100,26 @@ button {
   gap: 10px;
 }
 
-.codex-home-control {
+.agent-root-control {
   display: grid;
   gap: 3px;
-  min-width: 260px;
+  min-width: 240px;
   color: rgba(255, 255, 255, .72);
   font-size: 11px;
   font-weight: 700;
 }
 
-.codex-home-control input {
+.agent-provider-control {
+  display: grid;
+  gap: 3px;
+  min-width: 132px;
+  color: rgba(255, 255, 255, .72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.agent-root-control input,
+.agent-provider-control select {
   height: 34px;
   border: 1px solid rgba(255, 255, 255, .20);
   border-radius: 8px;
@@ -118,7 +128,7 @@ button {
   padding: 0 10px;
 }
 
-.codex-home-control input::placeholder {
+.agent-root-control input::placeholder {
   color: rgba(255, 255, 255, .58);
 }
 
@@ -288,7 +298,8 @@ h1 {
   color: #fff;
 }
 
-.empty-codex-home {
+.empty-agent-root,
+.empty-agent-provider {
   display: grid;
   gap: 6px;
   width: min(520px, 100%);
@@ -299,7 +310,8 @@ h1 {
   text-align: left;
 }
 
-.empty-codex-home input {
+.empty-agent-root input,
+.empty-agent-provider select {
   height: 40px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -883,7 +895,8 @@ pre {
     flex-wrap: wrap;
   }
 
-  .codex-home-control {
+  .agent-root-control,
+  .agent-provider-control {
     min-width: 100%;
   }
 

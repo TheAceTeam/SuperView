@@ -1,3 +1,5 @@
+export type AgentProvider = "codex" | "claude-code" | "opencode";
+
 export type CodexOuterType = "session_meta" | "turn_context" | "response_item" | "event_msg";
 
 export type EventKind =
@@ -56,6 +58,10 @@ export interface ParsedCodexLine {
   sha256: string;
 }
 
+export type ParsedAgentEvent = ParsedCodexLine & {
+  provider: AgentProvider;
+};
+
 export interface ProjectRecord {
   id: string;
   name: string;
@@ -75,6 +81,9 @@ export interface SessionRecord {
   cliVersion: string | null;
   modelProvider: string | null;
   source: string | null;
+  provider: AgentProvider;
+  externalSessionId: string;
+  agentName: string | null;
 }
 
 export interface TurnRecord {
@@ -91,6 +100,7 @@ export interface TurnRecord {
 export interface RawEventRef {
   id: string;
   sessionId: string;
+  provider: AgentProvider;
   lineNo: number;
   timestamp: string;
   type: string;
@@ -242,6 +252,31 @@ export interface IngestJob {
   currentFile?: string | null;
   workerPid?: number | null;
   processorVersion?: string | null;
+}
+
+export interface AgentSourceConfig {
+  provider: AgentProvider;
+  root?: string;
+  path?: string;
+  mode?: "files" | "cli-export";
+}
+
+export interface AgentLogSource {
+  provider: AgentProvider;
+  id: string;
+  path: string;
+  sizeBytes: number;
+  mtimeMs: number;
+}
+
+export interface AgentParseOptions {
+  repoRoot?: string | null;
+}
+
+export interface AgentLogAdapter {
+  provider: AgentProvider;
+  scan(config?: AgentSourceConfig): Promise<AgentLogSource[]>;
+  parseSource(source: AgentLogSource, options?: AgentParseOptions): Promise<NormalizedBundle | null>;
 }
 
 export interface IngestResult {

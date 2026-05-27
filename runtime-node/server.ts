@@ -1,5 +1,5 @@
 import express from "express";
-import { TimelineLane, TimelineQuery } from "../core/types";
+import { AgentProvider, AgentSourceConfig, TimelineLane, TimelineQuery } from "../core/types";
 import { SuperViewDatabase } from "../storage/database";
 import { IngestService } from "./ingest";
 
@@ -14,7 +14,7 @@ export function createServer() {
   });
 
   app.post("/api/ingest", (req, res) => {
-    const result = ingest.start(typeof req.body?.codexHome === "string" ? req.body.codexHome : undefined);
+    const result = ingest.start(parseIngestBody(req.body));
     res.status(202).json({ jobId: result.job.id, alreadyRunning: result.alreadyRunning, job: result.job });
   });
 
@@ -90,6 +90,31 @@ export function createServer() {
   });
 
   return app;
+}
+
+const AGENT_PROVIDERS: AgentProvider[] = ["codex", "claude-code", "opencode"];
+
+function parseIngestBody(body: unknown) {
+  if (!body || typeof body !== "object") return {};
+  const record = body as Record<string, unknown>;
+  const sources = Array.isArray(record.sources) ? record.sources.map(parseAgentSourceConfig).filter((source): source is AgentSourceConfig => Boolean(source)) : undefined;
+  return {
+    codexHome: typeof record.codexHome === "string" ? record.codexHome : undefined,
+    sources
+  };
+}
+
+function parseAgentSourceConfig(value: unknown): AgentSourceConfig | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const provider = typeof record.provider === "string" && AGENT_PROVIDERS.includes(record.provider as AgentProvider) ? (record.provider as AgentProvider) : null;
+  if (!provider) return null;
+  return {
+    provider,
+    root: typeof record.root === "string" ? record.root : undefined,
+    path: typeof record.path === "string" ? record.path : undefined,
+    mode: record.mode === "cli-export" || record.mode === "files" ? record.mode : undefined
+  };
 }
 
 const TIMELINE_LANES: TimelineLane[] = ["Product", "Architecture", "Code", "Agent Runs", "Verification", "Risks"];

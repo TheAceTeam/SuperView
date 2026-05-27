@@ -10,11 +10,18 @@ import { INGEST_PROCESSOR_VERSION } from "../runtime-node/ingest";
 
 let dataDir: string;
 let codexHome: string;
+let claudeHome: string;
 
 beforeEach(() => {
   dataDir = mkdtempSync(path.join(tmpdir(), "superview-test-"));
   codexHome = mkdtempSync(path.join(tmpdir(), "superview-codex-home-"));
+  claudeHome = mkdtempSync(path.join(tmpdir(), "superview-claude-home-"));
   cpSync(path.resolve("tests/fixtures/fake-codex-home"), codexHome, { recursive: true });
+  mkdirSync(path.join(claudeHome, "projects", "-tmp-superview-multi-agent"), { recursive: true });
+  cpSync(
+    path.resolve("tests/fixtures/claude-code-transcripts/sample-session.jsonl"),
+    path.join(claudeHome, "projects", "-tmp-superview-multi-agent", "sample-session.jsonl")
+  );
   process.env.SUPERVIEW_DATA_DIR = dataDir;
 });
 
@@ -24,6 +31,7 @@ afterEach(() => {
   delete process.env.SUPERVIEW_TEST_INGEST_FILE_DELAY_MS;
   rmSync(dataDir, { recursive: true, force: true });
   rmSync(codexHome, { recursive: true, force: true });
+  rmSync(claudeHome, { recursive: true, force: true });
 });
 
 describe("SuperView API", () => {
@@ -38,6 +46,28 @@ describe("SuperView API", () => {
     expect(ingest.body.jobId).toBeTruthy();
     const job = await waitForJob(app, ingest.body.jobId);
     expect(job.status).toBe("completed");
+  });
+
+  it("ingests multiple agent providers into the same API surface", async () => {
+    const app = createServer();
+    const ingest = await request(app)
+      .post("/api/ingest")
+      .send({
+        sources: [
+          { provider: "codex", root: codexHome },
+          { provider: "claude-code", root: claudeHome }
+        ]
+      });
+    expect(ingest.status).toBe(202);
+
+    const job = await waitForJob(app, ingest.body.jobId);
+    expect(job.status).toBe("completed");
+    expect(job.totalFiles).toBe(2);
+
+    const projects = await request(app).get("/api/projects");
+    expect(projects.status).toBe(200);
+    const sessions = projects.body.projects.flatMap((project: { sessions: Array<{ provider: string }> }) => project.sessions);
+    expect(sessions.map((session: { provider: string }) => session.provider)).toEqual(expect.arrayContaining(["codex", "claude-code"]));
   });
 
   it("skips unchanged files, paginates timelines, and returns redacted event evidence", async () => {

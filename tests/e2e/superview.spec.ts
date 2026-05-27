@@ -415,8 +415,8 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
 
   await page.goto("/");
 
-  await page.getByRole("textbox", { name: "Codex home path", exact: true }).fill("tests/fixtures/fake-codex-home");
-  await page.getByRole("button", { name: "Scan Codex Logs" }).first().click();
+  await page.getByRole("textbox", { name: "Agent log root path", exact: true }).fill("tests/fixtures/fake-codex-home");
+  await page.getByRole("button", { name: "Scan Agent Logs" }).first().click();
 
   await expect(page.getByText(/Ingest completed/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("CLI Conversation", { exact: true })).toBeVisible();

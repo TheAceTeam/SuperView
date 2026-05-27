@@ -1,7 +1,7 @@
 import { SuperViewDatabase } from "../storage/database";
-import { runIngestJob } from "./ingest";
+import { parseIngestOptions, runIngestJob } from "./ingest";
 
-const [jobId, codexHome] = process.argv.slice(2);
+const [jobId, encodedOptions] = process.argv.slice(2);
 
 if (!jobId) {
   throw new Error("Missing ingest job id");
@@ -14,7 +14,7 @@ try {
     markFailed(db, jobId, "Forced ingest worker failure");
     process.exitCode = 1;
   } else {
-    await runIngestJob(db, jobId, codexHome || undefined, { workerPid: process.pid });
+    await runIngestJob(db, jobId, parseIngestOptions(encodedOptions), { workerPid: process.pid });
   }
 } finally {
   db.close();

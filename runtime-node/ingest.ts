@@ -1,29 +1,30 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import type { Stats } from "node:fs";
-import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseCodexJsonlFile } from "../core/parser";
-import { normalizeCodexLines } from "../core/normalizer";
-import { CodexHistoryPrompt, GitCommitRecord, IngestJob } from "../core/types";
+import { AgentLogAdapter, AgentLogSource, AgentSourceConfig, CodexHistoryPrompt, GitCommitRecord, IngestJob, NormalizedBundle } from "../core/types";
 import { SuperViewDatabase } from "../storage/database";
 import { resolveCodexHome } from "../storage/paths";
-import { parseCodexHistoryJsonlFile } from "./history";
-import { scanRolloutFiles } from "./scanner";
+import { adapterForProvider, defaultAdapters } from "./adapters";
 import { getCommits, getRepoRoot } from "./git-provider";
+import { parseCodexHistoryJsonlFile } from "./history";
 
-export const INGEST_PROCESSOR_VERSION = "2026-05-27-token-count-v1";
+export const INGEST_PROCESSOR_VERSION = "2026-05-27-multi-agent-v1";
 
 export interface IngestStartResult {
   job: IngestJob;
   alreadyRunning: boolean;
 }
 
-interface RolloutCandidate {
-  file: string;
-  stats: Stats;
+export interface IngestStartOptions {
+  codexHome?: string;
+  sources?: AgentSourceConfig[];
+}
+
+interface IngestCandidate {
+  source: AgentLogSource;
+  adapter: AgentLogAdapter;
 }
 
 export class IngestService {
@@ -31,12 +32,13 @@ export class IngestService {
 
   constructor(private db: SuperViewDatabase) {}
 
-  start(codexHome?: string): IngestStartResult {
+  start(options: IngestStartOptions | string = {}): IngestStartResult {
     const activeJob = this.db.getActiveIngestJob();
     if (activeJob) {
       return { job: activeJob, alreadyRunning: true };
     }
 
+    const ingestOptions = typeof options === "string" ? { codexHome: options } : options;
     const now = new Date().toISOString();
     const job: IngestJob = {
       id: randomUUID(),
@@ -58,7 +60,7 @@ export class IngestService {
       processorVersion: INGEST_PROCESSOR_VERSION
     };
     this.db.upsertJob(job);
-    const worker = this.spawnWorker(job.id, codexHome);
+    const worker = this.spawnWorker(job.id, ingestOptions);
     if (worker.pid) {
       job.workerPid = worker.pid;
       this.db.upsertJob(job);
@@ -70,8 +72,8 @@ export class IngestService {
     return this.db.getJob(jobId);
   }
 
-  private spawnWorker(jobId: string, codexHome?: string) {
-    const { command, args } = buildWorkerCommand(jobId, codexHome);
+  private spawnWorker(jobId: string, options: IngestStartOptions) {
+    const { command, args } = buildWorkerCommand(jobId, options);
     const worker = spawn(command, args, {
       cwd: process.cwd(),
       env: { ...process.env },
@@ -112,7 +114,7 @@ export class IngestService {
   }
 }
 
-export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHome?: string, options: { workerPid?: number | null } = {}) {
+export async function runIngestJob(db: SuperViewDatabase, jobId: string, ingestOptions: IngestStartOptions | string = {}, options: { workerPid?: number | null } = {}) {
   const job = db.getJob(jobId);
   if (!job) {
     throw new Error(`Ingest job ${jobId} not found`);
@@ -125,26 +127,27 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
     job.processorVersion = INGEST_PROCESSOR_VERSION;
     db.upsertJob(job);
 
-    const files = await scanRolloutFiles(codexHome);
+    const normalizedOptions = typeof ingestOptions === "string" ? { codexHome: ingestOptions } : ingestOptions;
+    const adapterConfigs = resolveAdapterConfigs(normalizedOptions);
+    const sources = await scanAgentSources(adapterConfigs);
     job.phase = "diffing";
-    job.totalFiles = files.length;
-    job.candidateFiles = files.length;
+    job.totalFiles = sources.length;
+    job.candidateFiles = sources.length;
     db.upsertJob(job);
 
-    const candidates: RolloutCandidate[] = [];
+    const candidates: IngestCandidate[] = [];
     let skippedFiles = 0;
     let skippedBytes = 0;
     let totalBytes = 0;
 
-    for (const file of files) {
-      const fileStats = await stat(file);
-      totalBytes += fileStats.size;
-      const previous = db.getIngestedFile(file);
-      if (previous && previous.mtimeMs === fileStats.mtimeMs && previous.sizeBytes === fileStats.size && previous.processorVersion === INGEST_PROCESSOR_VERSION) {
+    for (const candidate of sources) {
+      totalBytes += candidate.source.sizeBytes;
+      const previous = db.getIngestedFile(candidate.source.id);
+      if (previous && previous.mtimeMs === candidate.source.mtimeMs && previous.sizeBytes === candidate.source.sizeBytes && previous.processorVersion === INGEST_PROCESSOR_VERSION) {
         skippedFiles += 1;
-        skippedBytes += fileStats.size;
+        skippedBytes += candidate.source.sizeBytes;
       } else {
-        candidates.push({ file, stats: fileStats });
+        candidates.push(candidate);
       }
     }
 
@@ -155,7 +158,8 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
     job.totalBytes = totalBytes;
     db.upsertJob(job);
 
-    const historyBySessionId = candidates.length > 0 ? await loadHistoryForJob(db, job, codexHome) : new Map<string, CodexHistoryPrompt[]>();
+    const codexRoot = adapterConfigs.find((config) => config.provider === "codex")?.root ?? normalizedOptions.codexHome;
+    const historyBySessionId = candidates.length > 0 ? await loadHistoryForJob(db, job, codexRoot) : new Map<string, CodexHistoryPrompt[]>();
     const repoRootsByCwd = new Map<string, string | null>();
     const commitsByRepoRoot = new Map<string, GitCommitRecord[]>();
 
@@ -164,31 +168,24 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
 
     for (const candidate of candidates) {
       job.phase = "parsing";
-      job.currentFile = candidate.file;
+      job.currentFile = candidate.source.path;
       db.upsertJob(job);
       await maybeDelayForTests();
 
       try {
-        const lines = await parseCodexJsonlFile(candidate.file);
-        const meta = lines.find((line) => line.type === "session_meta");
-        const cwd = extractCwd(meta?.payload);
-
-        job.phase = "normalizing";
-        db.upsertJob(job);
-        const repoRoot = cwd ? await cachedRepoRoot(repoRootsByCwd, cwd) : null;
-        const bundle = normalizeCodexLines(lines, { repoRoot });
+        const bundle = await parseCandidateWithRepoRoot(candidate, repoRootsByCwd);
 
         job.phase = "writing";
         db.upsertJob(job);
         if (bundle) {
-          bundle.historyPrompts = historyBySessionId.get(bundle.session.id) ?? [];
-          bundle.gitCommits = repoRoot ? await cachedCommits(commitsByRepoRoot, repoRoot, bundle.session.startedAt, bundle.session.endedAt) : [];
+          bundle.historyPrompts = normalizeHistoryPrompts(historyBySessionId.get(bundle.session.externalSessionId) ?? historyBySessionId.get(bundle.session.id) ?? [], bundle.session.id);
+          bundle.gitCommits = bundle.project.repoRoot ? await cachedCommits(commitsByRepoRoot, bundle.project.repoRoot, bundle.session.startedAt, bundle.session.endedAt) : [];
           db.upsertBundle(bundle);
           db.upsertIngestedFile({
-            path: candidate.file,
-            mtimeMs: candidate.stats.mtimeMs,
-            sizeBytes: candidate.stats.size,
-            sha256: lines.at(-1)?.sha256 ?? null,
+            path: candidate.source.id,
+            mtimeMs: candidate.source.mtimeMs,
+            sizeBytes: candidate.source.sizeBytes,
+            sha256: null,
             sessionId: bundle.session.id,
             processorVersion: INGEST_PROCESSOR_VERSION,
             processedAt: new Date().toISOString()
@@ -198,21 +195,21 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
           job.totalEvents += bundle.events.length;
         } else {
           db.upsertIngestedFile({
-            path: candidate.file,
-            mtimeMs: candidate.stats.mtimeMs,
-            sizeBytes: candidate.stats.size,
-            sha256: lines.at(-1)?.sha256 ?? null,
+            path: candidate.source.id,
+            mtimeMs: candidate.source.mtimeMs,
+            sizeBytes: candidate.source.sizeBytes,
+            sha256: null,
             sessionId: null,
             processorVersion: INGEST_PROCESSOR_VERSION,
             processedAt: new Date().toISOString()
           });
         }
       } catch (error) {
-        job.errors.push(`${candidate.file}: ${error instanceof Error ? error.message : String(error)}`);
+        job.errors.push(`${candidate.source.path}: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       job.processedFiles += 1;
-      job.processedBytes = (job.processedBytes ?? 0) + candidate.stats.size;
+      job.processedBytes = (job.processedBytes ?? 0) + candidate.source.sizeBytes;
       job.currentFile = null;
       db.upsertJob(job);
     }
@@ -232,6 +229,39 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
     db.upsertJob(job);
     return null;
   }
+}
+
+function normalizeHistoryPrompts(prompts: CodexHistoryPrompt[], sessionId: string): CodexHistoryPrompt[] {
+  return prompts.map((prompt) => ({ ...prompt, sessionId }));
+}
+
+function resolveAdapterConfigs(options: IngestStartOptions): AgentSourceConfig[] {
+  if (options.sources && options.sources.length > 0) {
+    return options.sources;
+  }
+  if (options.codexHome) {
+    return [{ provider: "codex", root: options.codexHome }];
+  }
+  return defaultAdapters().map((adapter) => ({ provider: adapter.provider }));
+}
+
+async function scanAgentSources(configs: AgentSourceConfig[]): Promise<IngestCandidate[]> {
+  const candidates: IngestCandidate[] = [];
+  for (const config of configs) {
+    const adapter = adapterForProvider(config.provider);
+    const sources = await adapter.scan(config);
+    candidates.push(...sources.map((source) => ({ source, adapter })));
+  }
+  return candidates;
+}
+
+async function parseCandidateWithRepoRoot(candidate: IngestCandidate, repoRootsByCwd: Map<string, string | null>): Promise<NormalizedBundle | null> {
+  const initial = await candidate.adapter.parseSource(candidate.source);
+  if (!initial) return null;
+  const repoRoot = await cachedRepoRoot(repoRootsByCwd, initial.session.cwd);
+  if (!repoRoot) return initial;
+  if (initial.project.repoRoot === repoRoot) return initial;
+  return candidate.adapter.parseSource(candidate.source, { repoRoot });
 }
 
 async function loadHistoryBySessionId(codexHome?: string) {
@@ -275,10 +305,11 @@ function isCommitInWindow(commit: GitCommitRecord, from?: string | null, to?: st
   return true;
 }
 
-function buildWorkerCommand(jobId: string, codexHome?: string) {
+function buildWorkerCommand(jobId: string, options: IngestStartOptions) {
   const workerPath = workerPathFromImportMeta();
   const tsxCli = path.resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
-  const args = [workerPath, jobId, ...(codexHome ? [codexHome] : [])];
+  const encodedOptions = Buffer.from(JSON.stringify(options), "utf8").toString("base64url");
+  const args = [workerPath, jobId, encodedOptions];
   if (existsSync(tsxCli)) {
     return { command: process.execPath, args: [tsxCli, ...args] };
   }
@@ -300,9 +331,11 @@ async function maybeDelayForTests() {
   }
 }
 
-function extractCwd(payload: unknown): string | null {
-  if (payload && typeof payload === "object" && "cwd" in payload && typeof payload.cwd === "string") {
-    return payload.cwd;
+export function parseIngestOptions(value: string | undefined): IngestStartOptions {
+  if (!value) return {};
+  try {
+    return JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as IngestStartOptions;
+  } catch {
+    return { codexHome: value };
   }
-  return null;
 }

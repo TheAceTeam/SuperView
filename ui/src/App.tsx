@@ -1,6 +1,6 @@
 import { AlertTriangle, FileText, Moon, RotateCw, Search, Sun } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, SkillUsage, TaskJourney, TaskJourneyDetail, TimelineEvent, TokenUsage } from "../../core/types";
+import type { AgentProvider, Artifact, EventEvidence, IngestJob, ProjectTimeline, SkillUsage, TaskJourney, TaskJourneyDetail, TimelineEvent, TokenUsage } from "../../core/types";
 import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
@@ -21,7 +21,8 @@ export function App() {
   const [eventEvidence, setEventEvidence] = useState<EventEvidence | null>(null);
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [job, setJob] = useState<IngestJob | null>(null);
-  const [codexHome, setCodexHome] = useState("");
+  const [agentProvider, setAgentProvider] = useState<AgentProvider>("codex");
+  const [agentLogRoot, setAgentLogRoot] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,7 +126,8 @@ export function App() {
 
   async function handleScan() {
     setError(null);
-    const jobId = await startIngest(codexHome.trim() || undefined);
+    const root = agentLogRoot.trim();
+    const jobId = await startIngest(root ? { sources: [{ provider: agentProvider, root: root, path: root }] } : { sources: [{ provider: agentProvider }] });
     setJob(await fetchIngestJob(jobId));
   }
 
@@ -172,21 +174,29 @@ export function App() {
       <header className="topbar">
         <div className="brand">
           <strong>SuperView</strong>
-          <span>Codex timeline command center</span>
+          <span>Agent timeline command center</span>
         </div>
         <div className="topbar-actions">
-          <label className="codex-home-control">
-            <span>Codex home</span>
+          <label className="agent-root-control">
+            <span>Agent log root</span>
             <input
-              aria-label="Codex home path"
-              value={codexHome}
-              onChange={(event) => setCodexHome(event.target.value)}
-              placeholder="Server default"
+              aria-label="Agent log root path"
+              value={agentLogRoot}
+              onChange={(event) => setAgentLogRoot(event.target.value)}
+              placeholder="Blank scans default Codex logs"
             />
+          </label>
+          <label className="agent-provider-control">
+            <span>Source</span>
+            <select aria-label="Agent log source" value={agentProvider} onChange={(event) => setAgentProvider(event.target.value as AgentProvider)}>
+              <option value="codex">Codex</option>
+              <option value="claude-code">Claude Code</option>
+              <option value="opencode">OpenCode</option>
+            </select>
           </label>
           <button className="shell-button" onClick={handleScan} disabled={job?.status === "running"}>
             <RotateCw size={16} />
-            Scan Codex Logs
+            Scan Agent Logs
           </button>
           <button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
             {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
@@ -199,7 +209,7 @@ export function App() {
           <div>
             <p className="eyebrow">Project Timeline</p>
             <h1>{selectedProject?.name ?? "No project indexed yet"}</h1>
-            <p className="lead">Replay each user input as the Codex CLI conversation, with background work available on demand.</p>
+            <p className="lead">Replay each user input as an agent conversation, with background work available on demand.</p>
           </div>
           <div className="title-actions">
             <div className="project-selector-panel">
@@ -224,9 +234,9 @@ export function App() {
         {job ? <JobStrip job={job} /> : null}
 
         {loading ? (
-          <EmptyState title="Loading SuperView index" detail="Checking local SQLite state." codexHome={codexHome} onCodexHomeChange={setCodexHome} onScan={handleScan} />
+          <EmptyState title="Loading SuperView index" detail="Checking local SQLite state." agentProvider={agentProvider} onAgentProviderChange={setAgentProvider} agentLogRoot={agentLogRoot} onAgentLogRootChange={setAgentLogRoot} onScan={handleScan} />
         ) : projects.length === 0 ? (
-          <EmptyState title="No Codex runs indexed" detail="Scan local rollout JSONL files from ~/.codex/sessions to build the first timeline." codexHome={codexHome} onCodexHomeChange={setCodexHome} onScan={handleScan} />
+          <EmptyState title="No agent runs indexed" detail="Scan local Codex, Claude Code, or OpenCode logs to build the first timeline." agentProvider={agentProvider} onAgentProviderChange={setAgentProvider} agentLogRoot={agentLogRoot} onAgentLogRootChange={setAgentLogRoot} onScan={handleScan} />
         ) : (
           <div className="dashboard-grid conversation-dashboard-grid">
             <section className="timeline-panel">
@@ -337,7 +347,9 @@ function ConversationTurn({
   const backgroundEvents = events.filter((event) => event.kind !== "user_prompt" && event.id !== assistantMessage?.id);
   const logEvents = events.filter((event) => event.kind === "tool_call" || event.kind === "tool_result" || event.kind === "file_change" || event.kind === "verification" || event.kind === "error");
   const skills = aggregateSkills(journey.skills, events);
-  const codexOutput = assistantMessage?.detail ?? assistantMessage?.title ?? journey.summary;
+  const agentOutput = assistantMessage?.detail ?? assistantMessage?.title ?? journey.summary;
+  const provider = prompt ? providerFromSessionId(prompt.sessionId) : providerFromSessionId(journey.sessionId);
+  const agentLabel = labelForProvider(provider);
   const promptText = prompt?.detail ?? journey.title;
 
   return (
@@ -364,7 +376,7 @@ function ConversationTurn({
       />
 
       <div className="message-row codex detail-message-row">
-        <span className="message-avatar" aria-hidden="true">C</span>
+        <span className="message-avatar" aria-hidden="true">{avatarForProvider(provider)}</span>
         <div className="message-stack">
           <button className="conversation-message codex detail-toggle" onClick={onToggleDetails}>
             <span className="message-meta">Agent work</span>
@@ -421,8 +433,8 @@ function ConversationTurn({
 
       <ChatBubble
         variant="codex"
-        label="Codex CLI"
-        text={codexOutput}
+        label={agentLabel}
+        text={agentOutput}
         skills={skills}
         selected={assistantMessage?.id === selectedEventId}
         disabled={!assistantMessage}
@@ -532,6 +544,24 @@ function formatExitType(exitType: TaskJourney["exitType"]) {
   return exitType === "next_prompt" ? "Next input" : "Session end";
 }
 
+function providerFromSessionId(sessionId: string) {
+  if (sessionId.startsWith("claude-code:")) return "claude-code";
+  if (sessionId.startsWith("opencode:")) return "opencode";
+  return "codex";
+}
+
+function labelForProvider(provider: string) {
+  if (provider === "claude-code") return "Claude Code";
+  if (provider === "opencode") return "OpenCode";
+  return "Codex CLI";
+}
+
+function avatarForProvider(provider: string) {
+  if (provider === "claude-code") return "CC";
+  if (provider === "opencode") return "OC";
+  return "C";
+}
+
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="metric">
@@ -553,14 +583,18 @@ function RatioMetric({ label, value }: { label: string; value: string }) {
 function EmptyState({
   title,
   detail,
-  codexHome,
-  onCodexHomeChange,
+  agentProvider,
+  onAgentProviderChange,
+  agentLogRoot,
+  onAgentLogRootChange,
   onScan
 }: {
   title: string;
   detail: string;
-  codexHome: string;
-  onCodexHomeChange: (value: string) => void;
+  agentProvider: AgentProvider;
+  onAgentProviderChange: (value: AgentProvider) => void;
+  agentLogRoot: string;
+  onAgentLogRootChange: (value: string) => void;
   onScan: () => void;
 }) {
   return (
@@ -568,11 +602,19 @@ function EmptyState({
       <Search size={34} />
       <h2>{title}</h2>
       <p>{detail}</p>
-      <label className="empty-codex-home">
-        <span>Codex home path</span>
-        <input aria-label="Empty Codex home path" value={codexHome} onChange={(event) => onCodexHomeChange(event.target.value)} placeholder="Blank uses server default" />
+      <label className="empty-agent-provider">
+        <span>Agent log source</span>
+        <select aria-label="Empty agent log source" value={agentProvider} onChange={(event) => onAgentProviderChange(event.target.value as AgentProvider)}>
+          <option value="codex">Codex</option>
+          <option value="claude-code">Claude Code</option>
+          <option value="opencode">OpenCode</option>
+        </select>
       </label>
-      <button className="primary-button" onClick={onScan}>Scan Codex Logs</button>
+      <label className="empty-agent-root">
+        <span>Agent log root path</span>
+        <input aria-label="Empty agent log root path" value={agentLogRoot} onChange={(event) => onAgentLogRootChange(event.target.value)} placeholder="Blank scans default Codex logs" />
+      </label>
+      <button className="primary-button" onClick={onScan}>Scan Agent Logs</button>
     </section>
   );
 }
