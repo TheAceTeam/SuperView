@@ -165,7 +165,7 @@ export function App() {
   const pageEnd = Math.min(timelineOffset + (timeline?.events.length ?? 0), totalEvents);
   const hasPreviousPage = timelineOffset > 0;
   const hasNextPage = totalEvents > timelineOffset + currentLimit;
-  const projectTokenUsage = timeline?.tokenUsage ?? ZERO_TOKEN_USAGE;
+  const projectTokenUsage = selectedProject?.tokenUsage ?? timeline?.tokenUsage ?? ZERO_TOKEN_USAGE;
 
   return (
     <div className="app-shell">
@@ -206,7 +206,7 @@ export function App() {
               <label className="field-label" htmlFor="project-select">Project</label>
               <select id="project-select" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)}>
                 {projects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name}</option>
+                  <option key={project.id} value={project.id}>{project.name} - {formatCompactNumber(project.tokenUsage.total)} tokens / KV {formatKvHitRate(project.tokenUsage)}</option>
                 ))}
               </select>
             </div>
@@ -632,6 +632,10 @@ function formatDuration(durationMs: number) {
 function formatKvHitRate(usage: TokenUsage) {
   if (usage.input <= 0) return "0.0%";
   return `${((usage.cachedInput / usage.input) * 100).toFixed(1)}%`;
+}
+
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
 const ZERO_TOKEN_USAGE: TokenUsage = { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 };

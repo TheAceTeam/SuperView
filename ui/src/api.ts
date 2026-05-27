@@ -1,4 +1,4 @@
-import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, RunReplay, SessionRecord, TaskJourneyDetail } from "../../core/types";
+import type { Artifact, EventEvidence, IngestJob, ProjectTimeline, RunReplay, SessionRecord, TaskJourneyDetail, TokenUsage } from "../../core/types";
 
 export interface ProjectWithSessions {
   id: string;
@@ -7,6 +7,7 @@ export interface ProjectWithSessions {
   repoRoot: string | null;
   createdAt: string;
   updatedAt: string;
+  tokenUsage: TokenUsage;
   sessions: SessionRecord[];
 }
 

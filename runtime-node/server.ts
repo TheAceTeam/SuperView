@@ -30,6 +30,7 @@ export function createServer() {
   app.get("/api/projects", (_req, res) => {
     const projects = db.listProjects().map((project) => ({
       ...project,
+      tokenUsage: db.getProjectTokenUsage(project.id),
       sessions: db.listSessions(project.id)
     }));
     res.json({ projects });

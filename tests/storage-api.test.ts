@@ -185,7 +185,15 @@ describe("SuperView API", () => {
       expect(job.status).toBe("completed");
 
       const projects = await request(app).get("/api/projects");
-      const projectId = projects.body.projects.find((project: { name: string }) => project.name === "superview-token").id;
+      const project = projects.body.projects.find((candidate: { name: string }) => candidate.name === "superview-token");
+      const projectId = project.id;
+      expect(project.tokenUsage).toEqual({
+        input: 120,
+        output: 30,
+        reasoning: 10,
+        cachedInput: 40,
+        total: 160
+      });
       const timeline = await request(app).get(`/api/projects/${projectId}/timeline`).query({ limit: 20 });
       expect(timeline.body.tokenUsage).toEqual({
         input: 120,

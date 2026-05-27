@@ -25,6 +25,13 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
             repoRoot: "/tmp/superview-fixture",
             createdAt: "2026-05-25T02:00:00.000Z",
             updatedAt: "2026-05-25T02:00:00.000Z",
+            tokenUsage: {
+              input: 4312,
+              output: 1260,
+              reasoning: 842,
+              cachedInput: 910,
+              total: 6414
+            },
             sessions: [
               {
                 id: "fixture-tool-session",
@@ -372,10 +379,12 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await expect(page.getByText("Run Ledger", { exact: true })).toHaveCount(0);
   await expect(page.locator(".run-row")).toHaveCount(0);
   await expect(page.getByLabel("Project")).toBeVisible();
-  await expect(page.locator(".title-actions").getByText("Tokens")).toBeVisible();
-  await expect(page.locator(".title-actions").getByText("6,414")).toBeVisible();
-  await expect(page.locator(".title-actions").getByText("KV hit")).toBeVisible();
-  await expect(page.locator(".title-actions").getByText("21.1%")).toBeVisible();
+  await expect(page.locator(".status-cluster").getByText("Tokens", { exact: true })).toBeVisible();
+  await expect(page.locator(".status-cluster").getByText("6,414", { exact: true })).toBeVisible();
+  await expect(page.locator(".status-cluster").getByText("KV hit", { exact: true })).toBeVisible();
+  await expect(page.locator(".status-cluster").getByText("21.1%", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Project")).toHaveValue("project-fixture");
+  await expect(page.getByLabel("Project")).toContainText("6.4K tokens / KV 21.1%");
   await expect(page.getByText("User", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Codex CLI", { exact: true }).first()).toBeVisible();
   await expect(page.locator(".conversation-turn").first().getByText("Build task journey from input 0")).toBeVisible();
