@@ -157,7 +157,7 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
 
     const historyBySessionId = candidates.length > 0 ? await loadHistoryForJob(db, job, codexHome) : new Map<string, CodexHistoryPrompt[]>();
     const repoRootsByCwd = new Map<string, string | null>();
-    const commitsByWindow = new Map<string, GitCommitRecord[]>();
+    const commitsByRepoRoot = new Map<string, GitCommitRecord[]>();
 
     let projectCount = 0;
     let sessionCount = 0;
@@ -182,7 +182,7 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, codexHo
         db.upsertJob(job);
         if (bundle) {
           bundle.historyPrompts = historyBySessionId.get(bundle.session.id) ?? [];
-          bundle.gitCommits = repoRoot ? await cachedCommits(commitsByWindow, repoRoot, bundle.session.startedAt, bundle.session.endedAt) : [];
+          bundle.gitCommits = repoRoot ? await cachedCommits(commitsByRepoRoot, repoRoot, bundle.session.startedAt, bundle.session.endedAt) : [];
           db.upsertBundle(bundle);
           db.upsertIngestedFile({
             path: candidate.file,
@@ -257,12 +257,22 @@ async function cachedRepoRoot(cache: Map<string, string | null>, cwd: string) {
 }
 
 async function cachedCommits(cache: Map<string, GitCommitRecord[]>, repoRoot: string, from?: string | null, to?: string | null) {
-  const cacheKey = `${repoRoot}\0${from ?? ""}\0${to ?? ""}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return cached;
-  const commits = await getCommits(repoRoot, from, to);
-  cache.set(cacheKey, commits);
-  return commits;
+  let commits = cache.get(repoRoot);
+  if (!commits) {
+    commits = await getCommits(repoRoot);
+    cache.set(repoRoot, commits);
+  }
+  return commits.filter((commit) => isCommitInWindow(commit, from, to));
+}
+
+function isCommitInWindow(commit: GitCommitRecord, from?: string | null, to?: string | null) {
+  const commitMs = Date.parse(commit.timestamp);
+  if (!Number.isFinite(commitMs)) return true;
+  const fromMs = from ? Date.parse(from) : null;
+  const toMs = to ? Date.parse(to) : null;
+  if (fromMs !== null && Number.isFinite(fromMs) && commitMs < fromMs) return false;
+  if (toMs !== null && Number.isFinite(toMs) && commitMs > toMs) return false;
+  return true;
 }
 
 function buildWorkerCommand(jobId: string, codexHome?: string) {
