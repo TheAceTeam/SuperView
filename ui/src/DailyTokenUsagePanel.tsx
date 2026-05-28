@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import type { DailyTokenUsagePoint, DailyTokenUsageResponse, TokenUsage } from "../../core/types";
+import { formatMillionTokens } from "./tokenFormat";
 
 export interface DailyTokenUsagePanelProps {
   data?: DailyTokenUsageResponse | DailyTokenUsagePoint[] | null;
@@ -54,11 +55,6 @@ const CHART_MARGIN = {
   left: 58
 };
 
-const TOKEN_FORMATTER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
-const COMPACT_TOKEN_FORMATTER = new Intl.NumberFormat(undefined, {
-  notation: "compact",
-  maximumFractionDigits: 1
-});
 const PERCENT_FORMATTER = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
   style: "percent"
@@ -441,11 +437,11 @@ function formatDateLabel(value: string) {
 }
 
 function formatTokens(value: number) {
-  return TOKEN_FORMATTER.format(Math.round(positiveNumber(value)));
+  return formatMillionTokens(positiveNumber(value));
 }
 
 function formatCompactTokens(value: number) {
-  return COMPACT_TOKEN_FORMATTER.format(Math.round(positiveNumber(value)));
+  return formatMillionTokens(positiveNumber(value));
 }
 
 function formatKvHit(value: number | null) {

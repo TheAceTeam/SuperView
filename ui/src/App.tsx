@@ -5,6 +5,7 @@ import type { AgentProvider, Artifact, DailyTokenUsageResponse, EventEvidence, I
 import { fetchDailyTokenUsage, fetchEventEvidence, fetchIngestJob, fetchProjects, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 import { DailyTokenUsagePanel } from "./DailyTokenUsagePanel";
 import { IngestLevelProgress } from "./IngestLevelProgress";
+import { formatMillionTokens } from "./tokenFormat";
 
 type Theme = "light" | "dark";
 type ProjectProviderFilter = AgentProvider | "all";
@@ -279,7 +280,7 @@ export function App() {
                 <span className="field-label">Project</span>
                 <select id="project-select" aria-label="Project" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)} disabled={filteredProjects.length === 0 || timelineLoading || ingestBusy}>
                   {filteredProjects.map((project) => (
-                    <option key={project.id} value={project.id}>{project.name} - {providerSummary(project)} - {formatCompactNumber(project.tokenUsage.total)} tokens / KV {formatKvHitRate(project.tokenUsage)}</option>
+                    <option key={project.id} value={project.id}>{project.name} - {providerSummary(project)} - {formatMillionTokens(project.tokenUsage.total)} tokens / KV {formatKvHitRate(project.tokenUsage)}</option>
                   ))}
                 </select>
               </label>
@@ -457,7 +458,7 @@ function ConversationTurn({
           <span>{journey.eventIds.length} events</span>
           <span>{formatExitType(journey.exitType)}</span>
           <span>{formatDuration(journey.durationMs)}</span>
-          <span>{journey.tokenUsage.total.toLocaleString()} tokens</span>
+          <span>{formatMillionTokens(journey.tokenUsage.total)} tokens</span>
           <span>KV hit {formatKvHitRate(journey.tokenUsage)}</span>
           {loading ? <span>Loading details</span> : null}
         </div>
@@ -678,7 +679,7 @@ function Metric({ label, value, action, overlay }: { label: string; value: numbe
         {label}
         {action}
       </span>
-      <strong>{value.toLocaleString()}</strong>
+      <strong>{formatMetricValue(label, value)}</strong>
       {overlay}
     </div>
   );
@@ -833,8 +834,8 @@ function formatKvHitRate(usage: TokenUsage) {
   return `${((usage.cachedInput / usage.input) * 100).toFixed(1)}%`;
 }
 
-function formatCompactNumber(value: number) {
-  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+function formatMetricValue(label: string, value: number) {
+  return label === "Tokens" ? formatMillionTokens(value) : value.toLocaleString();
 }
 
 function isIngestBusy(job: IngestJob | null) {

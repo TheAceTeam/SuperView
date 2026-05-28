@@ -548,7 +548,7 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await expect(page.locator(".run-row")).toHaveCount(0);
   await expect(page.getByLabel("Project", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("Tokens", { exact: true })).toBeVisible();
-  await expect(page.locator(".status-cluster").getByText("6,414", { exact: true })).toBeVisible();
+  await expect(page.locator(".status-cluster").getByText("0.006M", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("KV hit", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("21.1%", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Token usage by day" })).toHaveCount(0);
@@ -563,12 +563,12 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await tokensMetric.getByRole("button", { name: /Hide daily token usage chart/ }).click();
   await expect(page.getByRole("img", { name: "Daily token usage by date" })).toHaveCount(0);
   await expect(page.getByLabel("Project", { exact: true })).toHaveValue("project-fixture");
-  await expect(page.getByLabel("Project", { exact: true })).toContainText("6.4K tokens / KV 21.1%");
+  await expect(page.getByLabel("Project", { exact: true })).toContainText("0.006M tokens / KV 21.1%");
   await expect(page.getByText("User", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Codex CLI", { exact: true }).first()).toBeVisible();
   await expect(page.locator(".conversation-turn").first().getByText("Build task journey from input 0")).toBeVisible();
   await expect(page.locator(".conversation-turn").first().getByText("1m 14s")).toBeVisible();
-  await expect(page.locator(".conversation-turn").first().getByText("1,420 tokens")).toBeVisible();
+  await expect(page.locator(".conversation-turn").first().getByText("0.001M tokens")).toBeVisible();
   await expect(page.locator(".conversation-turn").first().getByText("KV hit 25.0%")).toBeVisible();
   await expect(page.locator(".conversation-turn").first().locator(".message-row.user").getByText("Build task journey from input 0")).toHaveCount(1);
   await expect(page.locator(".conversation-turn").first().locator(".message-row.user .skill-chip", { hasText: "abtest" })).toBeVisible();
