@@ -2,9 +2,10 @@
 
 ## TODO-001: Ingest Progress as a Mario-like Level Clear
 
-- **Status:** Planned
+- **Status:** Done
 - **Area:** UI / ingest job feedback
 - **Idea:** Replace or augment the current ingest progress bar with a Super Mario-style level clear progress animation.
+- **Implemented:** `ui/src/IngestLevelProgress.tsx`, wired into `ui/src/App.tsx`, covered by `tests/ingest-level-progress.test.tsx` and e2e.
 
 ### Desired Experience
 
@@ -32,9 +33,10 @@ Keep this as progress feedback, not decoration only. The animation should make i
 
 ## TODO-002: Daily Token Usage Chart Panel
 
-- **Status:** Planned
+- **Status:** Done
 - **Area:** Analytics / project metrics
 - **Idea:** Add a token statistics panel with daily bars/curve, hidden by default and expandable/collapsible on demand.
+- **Implemented:** `GET /api/projects/:id/token-usage/daily`, `ui/src/DailyTokenUsagePanel.tsx`, wired into `ui/src/App.tsx`, covered by storage/API and e2e tests.
 
 ### Desired Experience
 
@@ -57,9 +59,10 @@ The panel should explain token spend over time without crowding the main task th
 
 ## TODO-003: Blocking Loader During Long Operations
 
-- **Status:** Planned
+- **Status:** Done
 - **Area:** UI / interaction safety
 - **Idea:** Add a visible loading overlay/loader during long-running operations to prevent users from triggering conflicting actions mid-process.
+- **Implemented:** scoped workspace blocking loader in `ui/src/App.tsx` / `ui/src/styles.css`, with conflicting scan/project/timeline controls disabled and e2e coverage.
 
 ### Desired Experience
 
