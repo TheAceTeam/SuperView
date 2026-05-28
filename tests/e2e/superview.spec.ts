@@ -1,5 +1,90 @@
 import { expect, test } from "@playwright/test";
 
+test("filters projects by agent provider", async ({ page }) => {
+  await page.route("**/api/projects", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        projects: [
+          projectFixture("project-codex", "CodexProject", "codex"),
+          projectFixture("project-claude", "ClaudeProject", "claude-code"),
+          projectFixture("project-opencode", "OpenCodeProject", "opencode")
+        ]
+      })
+    });
+  });
+  await page.route("**/api/projects/*/timeline?**", async (route) => {
+    const projectId = route.request().url().match(/\/api\/projects\/([^/]+)\/timeline/)?.[1] ?? "project-codex";
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        project: { id: projectId, name: projectId, cwd: `/tmp/${projectId}`, repoRoot: `/tmp/${projectId}`, createdAt: "2026-05-25T02:00:00.000Z", updatedAt: "2026-05-25T02:00:00.000Z" },
+        episodes: [],
+        events: [],
+        causalEdges: [],
+        taskJourneys: [],
+        tokenUsage: { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 },
+        totalEvents: 0,
+        limit: 300,
+        offset: 0
+      })
+    });
+  });
+
+  await page.goto("/");
+
+  const projectFilter = page.getByLabel("Project provider", { exact: true });
+  const projectSelect = page.getByLabel("Project", { exact: true });
+  await expect(projectFilter).toHaveValue("all");
+  await expect(projectSelect).toContainText("CodexProject");
+  await expect(projectSelect).toContainText("ClaudeProject");
+  await expect(projectSelect).toContainText("OpenCodeProject");
+
+  await projectFilter.selectOption("claude-code");
+  await expect(projectSelect).toContainText("ClaudeProject");
+  await expect(projectSelect).not.toContainText("CodexProject");
+  await expect(projectSelect).not.toContainText("OpenCodeProject");
+  await expect(projectSelect).toHaveValue("project-claude");
+
+  await projectFilter.selectOption("opencode");
+  await expect(projectSelect).toContainText("OpenCodeProject");
+  await expect(projectSelect).not.toContainText("ClaudeProject");
+  await expect(projectSelect).toHaveValue("project-opencode");
+
+  await projectFilter.selectOption("all");
+  await expect(projectSelect).toContainText("CodexProject");
+  await expect(projectSelect).toContainText("ClaudeProject");
+  await expect(projectSelect).toContainText("OpenCodeProject");
+});
+
+function projectFixture(id: string, name: string, provider: "codex" | "claude-code" | "opencode") {
+  return {
+    id,
+    name,
+    cwd: `/tmp/${name}`,
+    repoRoot: `/tmp/${name}`,
+    createdAt: "2026-05-25T02:00:00.000Z",
+    updatedAt: "2026-05-25T02:00:00.000Z",
+    tokenUsage: { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 },
+    sessions: [
+      {
+        id: `${provider}:session`,
+        projectId: id,
+        path: `/tmp/${name}/session.jsonl`,
+        cwd: `/tmp/${name}`,
+        startedAt: "2026-05-25T02:00:00.000Z",
+        endedAt: "2026-05-25T02:01:00.000Z",
+        cliVersion: "fixture",
+        modelProvider: "fixture",
+        source: "fixture",
+        provider,
+        externalSessionId: "session",
+        agentName: provider
+      }
+    ]
+  };
+}
+
 test("scans fixture logs, renders an IM-style task thread, hides background detail, and toggles theme", async ({ page }) => {
   let timelineRequestCount = 0;
   let evidenceRequested = false;
@@ -423,13 +508,13 @@ test("scans fixture logs, renders an IM-style task thread, hides background deta
   await expect(page.getByText("User Inputs", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Run Ledger", { exact: true })).toHaveCount(0);
   await expect(page.locator(".run-row")).toHaveCount(0);
-  await expect(page.getByLabel("Project")).toBeVisible();
+  await expect(page.getByLabel("Project", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("Tokens", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("6,414", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("KV hit", { exact: true })).toBeVisible();
   await expect(page.locator(".status-cluster").getByText("21.1%", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Project")).toHaveValue("project-fixture");
-  await expect(page.getByLabel("Project")).toContainText("6.4K tokens / KV 21.1%");
+  await expect(page.getByLabel("Project", { exact: true })).toHaveValue("project-fixture");
+  await expect(page.getByLabel("Project", { exact: true })).toContainText("6.4K tokens / KV 21.1%");
   await expect(page.getByText("User", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Codex CLI", { exact: true }).first()).toBeVisible();
   await expect(page.locator(".conversation-turn").first().getByText("Build task journey from input 0")).toBeVisible();

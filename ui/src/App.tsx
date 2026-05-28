@@ -4,6 +4,7 @@ import type { AgentProvider, Artifact, EventEvidence, IngestJob, ProjectTimeline
 import { fetchEventEvidence, fetchIngestJob, fetchProjects, fetchTaskJourneyDetail, fetchTimeline, ProjectWithSessions, startIngest } from "./api";
 
 type Theme = "light" | "dark";
+type ProjectProviderFilter = AgentProvider | "all";
 
 const TIMELINE_LIMIT = 300;
 export function App() {
@@ -22,6 +23,7 @@ export function App() {
   const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [job, setJob] = useState<IngestJob | null>(null);
   const [agentProvider, setAgentProvider] = useState<AgentProvider>("codex");
+  const [projectProviderFilter, setProjectProviderFilter] = useState<ProjectProviderFilter>("all");
   const [agentLogRoot, setAgentLogRoot] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +41,19 @@ export function App() {
     if (!selectedProjectId) return;
     void loadTimeline(selectedProjectId, 0);
   }, [selectedProjectId]);
+
+  useEffect(() => {
+    const filtered = filterProjectsByProvider(projects, projectProviderFilter);
+    if (filtered.length === 0) {
+      setSelectedProjectId(null);
+      setTimeline(null);
+      setSelectedEvent(null);
+      return;
+    }
+    if (!selectedProjectId || !filtered.some((project) => project.id === selectedProjectId)) {
+      setSelectedProjectId(filtered[0].id);
+    }
+  }, [projects, projectProviderFilter, selectedProjectId]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -155,7 +170,8 @@ export function App() {
     });
   }
 
-  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+  const filteredProjects = useMemo(() => filterProjectsByProvider(projects, projectProviderFilter), [projects, projectProviderFilter]);
+  const selectedProject = filteredProjects.find((project) => project.id === selectedProjectId) ?? null;
   const journeys = timeline?.taskJourneys ?? [];
   const timelineEventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
 
@@ -212,16 +228,27 @@ export function App() {
             <p className="lead">Replay each user input as an agent conversation, with background work available on demand.</p>
           </div>
           <div className="title-actions">
-            <div className="project-selector-panel">
-              <label className="field-label" htmlFor="project-select">Project</label>
-              <select id="project-select" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)}>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>{project.name} - {formatCompactNumber(project.tokenUsage.total)} tokens / KV {formatKvHitRate(project.tokenUsage)}</option>
-                ))}
-              </select>
+            <div className="project-controls-panel">
+              <label className="project-control">
+                <span className="field-label">Provider</span>
+                <select aria-label="Project provider" value={projectProviderFilter} onChange={(event) => setProjectProviderFilter(event.target.value as ProjectProviderFilter)}>
+                  <option value="all">All</option>
+                  <option value="codex">Codex</option>
+                  <option value="claude-code">Claude Code</option>
+                  <option value="opencode">OpenCode</option>
+                </select>
+              </label>
+              <label className="project-control" htmlFor="project-select">
+                <span className="field-label">Project</span>
+                <select id="project-select" aria-label="Project" value={selectedProjectId ?? ""} onChange={(event) => setSelectedProjectId(event.target.value)} disabled={filteredProjects.length === 0}>
+                  {filteredProjects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.name} - {providerSummary(project)} - {formatCompactNumber(project.tokenUsage.total)} tokens / KV {formatKvHitRate(project.tokenUsage)}</option>
+                  ))}
+                </select>
+              </label>
             </div>
             <div className="status-cluster">
-              <Metric label="Projects" value={projects.length} />
+              <Metric label="Projects" value={filteredProjects.length} />
               <Metric label="Events" value={totalEvents} />
               <Metric label="Tasks" value={timeline?.taskJourneys.length ?? 0} />
               <Metric label="Tokens" value={projectTokenUsage.total} />
@@ -237,6 +264,8 @@ export function App() {
           <EmptyState title="Loading SuperView index" detail="Checking local SQLite state." agentProvider={agentProvider} onAgentProviderChange={setAgentProvider} agentLogRoot={agentLogRoot} onAgentLogRootChange={setAgentLogRoot} onScan={handleScan} />
         ) : projects.length === 0 ? (
           <EmptyState title="No agent runs indexed" detail="Scan local Codex, Claude Code, or OpenCode logs to build the first timeline." agentProvider={agentProvider} onAgentProviderChange={setAgentProvider} agentLogRoot={agentLogRoot} onAgentLogRootChange={setAgentLogRoot} onScan={handleScan} />
+        ) : filteredProjects.length === 0 ? (
+          <EmptyState title="No projects for this provider" detail="Switch the project filter to All, or scan logs for the selected provider." agentProvider={agentProvider} onAgentProviderChange={setAgentProvider} agentLogRoot={agentLogRoot} onAgentLogRootChange={setAgentLogRoot} onScan={handleScan} />
         ) : (
           <div className="dashboard-grid conversation-dashboard-grid">
             <section className="timeline-panel">
@@ -526,6 +555,17 @@ function SkillChips({ skills }: { skills: SkillUsage[] }) {
 
 function aggregateSkills(journeySkills: SkillUsage[] | undefined, events: TimelineEvent[]) {
   return dedupeSkills([...(journeySkills ?? []), ...events.flatMap((event) => event.skills ?? [])]);
+}
+
+function filterProjectsByProvider(projects: ProjectWithSessions[], provider: ProjectProviderFilter) {
+  if (provider === "all") return projects;
+  return projects.filter((project) => project.sessions.some((session) => session.provider === provider || session.id.startsWith(`${provider}:`)));
+}
+
+function providerSummary(project: ProjectWithSessions) {
+  const providers = new Set(project.sessions.map((session) => session.provider ?? providerFromSessionId(session.id)));
+  if (providers.size === 0) return "No provider";
+  return [...providers].map(labelForProvider).join("+");
 }
 
 function dedupeSkills(skills: SkillUsage[]) {

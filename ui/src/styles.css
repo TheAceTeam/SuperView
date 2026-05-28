@@ -383,13 +383,20 @@ select {
   color: var(--ink);
 }
 
-.project-selector-panel {
-  width: min(320px, 100%);
+.project-controls-panel {
+  display: grid;
+  grid-template-columns: minmax(120px, .65fr) minmax(220px, 1fr);
+  gap: 10px;
+  width: min(520px, 100%);
   padding: 10px 12px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-2);
   box-shadow: var(--shadow);
+}
+
+.project-control {
+  min-width: 0;
 }
 
 .episode-strip {
