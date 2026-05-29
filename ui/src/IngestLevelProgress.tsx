@@ -49,7 +49,7 @@ export function IngestLevelProgress({ job }: { job: IngestJob }) {
         </div>
         <div className="ingest-level-track">
           <span className="ingest-level-ground" style={{ width: `${percent}%` }} />
-          <img className="ingest-level-avatar" src={marioSprite} alt={job.status === "completed" ? "Pixel Mario victory" : "Pixel Mario running"} style={{ left: `clamp(0px, calc(${percent}% - 16px), calc(100% - 32px))` }} />
+          <img className="ingest-level-avatar" src={marioSprite} alt={job.status === "completed" ? "Pixel Mario victory" : "Pixel Mario running"} style={{ left: `clamp(0px, calc(${percent}% - 40px), calc(100% - 96px))` }} />
           <img className="ingest-level-flag" src={goalFlagSprite} alt="" aria-hidden="true" />
         </div>
       </div>

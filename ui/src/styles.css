@@ -1308,7 +1308,7 @@ pre {
 .ingest-level-stage {
   display: grid;
   gap: 8px;
-  min-height: 112px;
+  min-height: 146px;
   padding: 12px 10px 10px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--blue) 28%, var(--line));
@@ -1361,7 +1361,7 @@ pre {
 
 .ingest-level-track {
   position: relative;
-  min-height: 44px;
+  min-height: 104px;
   border-bottom: 10px solid color-mix(in srgb, var(--ink) 18%, var(--success));
 }
 
@@ -1381,8 +1381,8 @@ pre {
 }
 
 .ingest-level-avatar {
-  bottom: -2px;
-  width: 44px;
+  bottom: -3px;
+  width: 96px;
   height: auto;
   object-fit: contain;
   image-rendering: pixelated;
