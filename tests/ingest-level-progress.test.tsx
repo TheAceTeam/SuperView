@@ -35,6 +35,7 @@ describe("IngestLevelProgress", () => {
     expect(screen.getByText("Hazards 0")).toBeInTheDocument();
     expect(screen.getByText("Events 42")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Pixel Mario running" })).toHaveClass("ingest-level-avatar--running");
+    expect(screen.getByRole("img", { name: "Pixel Mario running" })).toHaveAttribute("data-frame-count", "6");
   });
 
   test("surfaces completed and failed visual states", () => {

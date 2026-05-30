@@ -52,7 +52,7 @@ export function IngestLevelProgress({ job }: { job: IngestJob }) {
           {isCompleted ? (
             <img className="ingest-level-avatar ingest-level-avatar--victory" src={marioVictorySprite} alt={avatarLabel} style={{ left: `clamp(0px, calc(${percent}% - 32px), calc(100% - 72px))` }} />
           ) : (
-            <span className="ingest-level-avatar ingest-level-avatar--running" role="img" aria-label={avatarLabel} style={{ left: `clamp(0px, calc(${percent}% - 26px), calc(100% - 64px))` }} />
+            <span className="ingest-level-avatar ingest-level-avatar--running" role="img" aria-label={avatarLabel} data-frame-count="6" style={{ left: `clamp(0px, calc(${percent}% - 26px), calc(100% - 64px))` }} />
           )}
           <img className="ingest-level-flag" src={goalFlagSprite} alt="" aria-hidden="true" />
         </div>

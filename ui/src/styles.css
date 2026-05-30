@@ -1396,9 +1396,9 @@ pre {
 
 .ingest-level-avatar--running {
   width: 64px;
-  height: 94px;
-  background: url("./assets/mario-walk-cycle.png") 0 100% / 256px 94px no-repeat;
-  animation: ingest-level-run 420ms steps(4) infinite;
+  height: 91px;
+  background: url("./assets/mario-walk-cycle.png") 0 100% / 384px 91px no-repeat;
+  animation: ingest-level-run 620ms steps(6) infinite;
 }
 
 .ingest-level-avatar--victory {
@@ -1434,7 +1434,7 @@ pre {
 
 @keyframes ingest-level-run {
   to {
-    background-position-x: -256px;
+    background-position-x: -384px;
   }
 }
 
