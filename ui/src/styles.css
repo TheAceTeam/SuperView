@@ -1396,8 +1396,8 @@ pre {
 
 .ingest-level-avatar--running {
   width: 64px;
-  height: 91px;
-  background: url("./assets/mario-walk-cycle.png") 0 100% / 384px 91px no-repeat;
+  height: 87px;
+  background: url("./assets/mario-walk-cycle.png") 0 100% / 384px 87px no-repeat;
   animation: ingest-level-run 620ms steps(6) infinite;
 }
 
