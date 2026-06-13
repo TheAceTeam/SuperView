@@ -34,6 +34,28 @@ function aggregateEventTokenUsage(events: TimelineEvent[]): TokenUsage {
   );
 }
 
+function resolveJourneyStatus(journeyEvents: TimelineEvent[]): EventStatus {
+  if (journeyEvents.length === 0) return "unknown";
+
+  // 1. If verification events exist, the last verification's status is the source of truth.
+  const verifications = journeyEvents.filter((event) => event.lane === "Verification");
+  const lastVerification = verifications.at(-1);
+  if (lastVerification) {
+    if (lastVerification.status === "success") return "success";
+    if (lastVerification.status === "failed") return "failed";
+  }
+
+  // 2. Otherwise look at the final event of the journey.
+  //    A trailing assistant response means the agent finished its turn — count as success.
+  //    A trailing error / failed event means the journey ended in failure.
+  const last = journeyEvents.at(-1)!;
+  if (last.kind === "assistant_message") return "success";
+  if (last.kind === "error" || last.status === "failed") return "failed";
+
+  // 3. Fall back to unknown for truncated or otherwise indeterminate journeys.
+  return "unknown";
+}
+
 export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): TaskJourney[] {
   const projectEvents = events.filter((event) => event.projectId === projectId);
   const promptIndexes = projectEvents
@@ -47,9 +69,7 @@ export function buildTaskJourneys(projectId: string, events: TimelineEvent[]): T
     const journeyEvents = projectEvents.slice(index, endIndex);
     const end = journeyEvents.at(-1) ?? prompt;
     const stages = buildTaskJourneyStages(journeyEvents);
-    const failures = journeyEvents.filter((event) => event.status === "failed").length;
-    const successes = journeyEvents.filter((event) => event.lane === "Verification" && event.status === "success").length;
-    const status: EventStatus = failures > 0 ? "failed" : successes > 0 ? "success" : "unknown";
+    const status: EventStatus = resolveJourneyStatus(journeyEvents);
     const stageCounts = stages.reduce<Partial<Record<TimelineLane, number>>>((counts, stage) => {
       counts[stage.lane] = stage.count;
       return counts;

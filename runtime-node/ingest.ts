@@ -10,7 +10,7 @@ import { adapterForProvider, defaultAdapters } from "./adapters";
 import { getCommits, getRepoRoot } from "./git-provider";
 import { parseCodexHistoryJsonlFile } from "./history";
 
-export const INGEST_PROCESSOR_VERSION = "2026-06-07-prune-stale-sources-v1";
+export const INGEST_PROCESSOR_VERSION = "2026-06-13-journey-status-v2";
 
 export interface IngestStartResult {
   job: IngestJob;

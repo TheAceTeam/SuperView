@@ -41,13 +41,22 @@ export function parsedEvent(input: {
 }
 
 export function makeTokenUsage(value: unknown): TokenUsage | null {
-  const input = firstNumber(value, ["input_tokens", "prompt_tokens", "input", "prompt"]);
+  const rawInput = firstNumber(value, ["input_tokens", "prompt_tokens", "input", "prompt"]);
   const output = firstNumber(value, ["output_tokens", "completion_tokens", "output", "completion"]);
   const reasoning = firstNumber(value, ["reasoning_tokens", "reasoning", "reasoning_output_tokens"]);
-  const cachedInput = firstNumber(value, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input", "cache_read", "read"]);
+  // OpenAI/Codex style: cached_tokens / cached_input_tokens are ALREADY included in prompt_tokens/input_tokens.
+  // Anthropic style: cache_read_input_tokens and cache_creation_input_tokens are reported SEPARATELY from input_tokens.
+  const cachedRead = firstNumber(value, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input", "cache_read", "read"]);
+  const anthropicCacheRead = firstNumber(value, ["cache_read_input_tokens"]);
+  const anthropicCacheCreation = firstNumber(value, ["cache_creation_input_tokens"]);
   const explicitTotal = firstNumber(value, ["total_tokens", "total"]);
+  const isAnthropicStyle = anthropicCacheRead !== null || anthropicCacheCreation !== null;
+  const input = isAnthropicStyle
+    ? (rawInput ?? 0) + (anthropicCacheRead ?? 0) + (anthropicCacheCreation ?? 0)
+    : rawInput;
+  const cachedInput = isAnthropicStyle ? (anthropicCacheRead ?? 0) : cachedRead;
   const total = explicitTotal ?? sumKnown(input, output);
-  if (input === null && output === null && reasoning === null && cachedInput === null && total === null) return null;
+  if (rawInput === null && output === null && reasoning === null && cachedRead === null && total === null && !isAnthropicStyle) return null;
   return {
     input: input ?? 0,
     output: output ?? 0,

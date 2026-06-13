@@ -548,15 +548,24 @@ function extractTokenUsage(payload: Record<string, unknown>): TokenUsage | null 
   const usageContainers = collectUsageContainers(payload);
   if (usageContainers.length === 0) return null;
 
-  const input = firstNumber(usageContainers, ["input_tokens", "prompt_tokens", "input", "prompt"]);
+  const rawInput = firstNumber(usageContainers, ["input_tokens", "prompt_tokens", "input", "prompt"]);
   const output = firstNumber(usageContainers, ["output_tokens", "completion_tokens", "output", "completion"]);
   const reasoning = firstNumber(usageContainers, ["reasoning_tokens", "reasoning"]);
-  const cachedInput = firstNumber(usageContainers, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input"]);
+  const cachedRead = firstNumber(usageContainers, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input"]);
+  // Anthropic style: cache_read_input_tokens / cache_creation_input_tokens are reported SEPARATELY from input_tokens.
+  // OpenAI/Codex style: cached_tokens is already INCLUDED in prompt_tokens/input_tokens.
+  const anthropicCacheRead = firstNumber(usageContainers, ["cache_read_input_tokens"]);
+  const anthropicCacheCreation = firstNumber(usageContainers, ["cache_creation_input_tokens"]);
+  const isAnthropicStyle = anthropicCacheRead !== null || anthropicCacheCreation !== null;
+  const input = isAnthropicStyle
+    ? (rawInput ?? 0) + (anthropicCacheRead ?? 0) + (anthropicCacheCreation ?? 0)
+    : rawInput;
+  const cachedInput = isAnthropicStyle ? (anthropicCacheRead ?? 0) : cachedRead;
   const explicitTotal = firstNumber(usageContainers, ["total_tokens", "total"]);
   const knownSum = sumNumbers(input, output, reasoning);
   const total = explicitTotal ?? knownSum;
 
-  if (input === null && output === null && reasoning === null && cachedInput === null && total === null) {
+  if (rawInput === null && output === null && reasoning === null && cachedRead === null && total === null && !isAnthropicStyle) {
     return null;
   }
 
@@ -577,15 +586,22 @@ function extractTokenCountTotalUsage(payload: Record<string, unknown>): TokenUsa
 }
 
 function tokenUsageFromContainer(container: Record<string, unknown>): TokenUsage | null {
-  const input = firstNumber(container, ["input_tokens", "prompt_tokens", "input", "prompt"]);
+  const rawInput = firstNumber(container, ["input_tokens", "prompt_tokens", "input", "prompt"]);
   const output = firstNumber(container, ["output_tokens", "completion_tokens", "output", "completion"]);
   const reasoning = firstNumber(container, ["reasoning_output_tokens", "reasoning_tokens", "reasoning"]);
-  const cachedInput = firstNumber(container, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input"]);
+  const cachedRead = firstNumber(container, ["cached_input_tokens", "cached_tokens", "cache_read_input_tokens", "cached_input"]);
+  const anthropicCacheRead = firstNumber(container, ["cache_read_input_tokens"]);
+  const anthropicCacheCreation = firstNumber(container, ["cache_creation_input_tokens"]);
+  const isAnthropicStyle = anthropicCacheRead !== null || anthropicCacheCreation !== null;
+  const input = isAnthropicStyle
+    ? (rawInput ?? 0) + (anthropicCacheRead ?? 0) + (anthropicCacheCreation ?? 0)
+    : rawInput;
+  const cachedInput = isAnthropicStyle ? (anthropicCacheRead ?? 0) : cachedRead;
   const explicitTotal = firstNumber(container, ["total_tokens", "total"]);
   const knownSum = sumNumbers(input, output);
   const total = explicitTotal ?? knownSum;
 
-  if (input === null && output === null && reasoning === null && cachedInput === null && total === null) {
+  if (rawInput === null && output === null && reasoning === null && cachedRead === null && total === null && !isAnthropicStyle) {
     return null;
   }
 
