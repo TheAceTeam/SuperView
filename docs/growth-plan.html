@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SuperView Growth Plan — GitHub Stars 增长分析</title>
+  <style>
+    :root {
+      --paper: #fcfaf7;
+      --surface: #f3f4f6;
+      --ink: #423d38;
+      --muted: #797067;
+      --orange: #fe6e00;
+      --blue: #3080ff;
+      --green: #00a949;
+      --red: #fb2c36;
+      --purple: #8200da;
+      --sans: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.6;
+      padding: 40px 24px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 {
+      font-size: 36px;
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 16px;
+      margin-bottom: 36px;
+      border-bottom: 2px solid var(--orange);
+      padding-bottom: 16px;
+    }
+    h2 {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 40px 0 16px;
+      padding: 0 0 8px;
+      border-bottom: 1px solid #ddd;
+    }
+    h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin: 24px 0 10px;
+    }
+    h4 {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 18px 0 6px;
+      color: var(--orange);
+    }
+    p, li { font-size: 15px; margin-bottom: 8px; }
+    ul, ol { padding-left: 22px; margin: 8px 0 16px; }
+    li { margin-bottom: 4px; }
+    strong { font-weight: 700; }
+    .tag {
+      display: inline-block;
+      padding: 1px 10px;
+      border-radius: 999px;
+      font: 700 11px/1.6 var(--mono);
+    }
+    .tag-green { background: #dcfce7; color: var(--green); }
+    .tag-red { background: #fee2e2; color: var(--red); }
+    .tag-blue { background: #dbeafe; color: var(--blue); }
+    .tag-yellow { background: #fef3c7; color: #b77900; }
+    .tag-purple { background: #f3e8ff; color: var(--purple); }
+    .tag-orange { background: #fff1e5; color: var(--orange); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+      margin: 12px 0 20px;
+    }
+    th {
+      text-align: left;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-bottom: 2px solid #ddd;
+    }
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    tr:hover td { background: #fafafa; }
+    .callout {
+      border-left: 4px solid var(--orange);
+      background: #fff1e5;
+      padding: 14px 16px;
+      border-radius: 6px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .callout strong { color: var(--orange); }
+    .card {
+      border: 1px solid #e3e0dd;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 12px 0 20px;
+      background: #fff;
+    }
+    .card h4 { margin-top: 0; }
+    .star { color: #f59e0b; }
+    code {
+      font-family: var(--mono);
+      font-size: 13px;
+      background: var(--surface);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    pre {
+      font-family: var(--mono);
+      font-size: 13px;
+      background: #1a1a2e;
+      color: #e4e4e7;
+      padding: 14px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 12px 0 20px;
+      line-height: 1.5;
+    }
+    .mini-scene {
+      display: flex;
+      gap: 6px;
+      margin: 8px 0;
+      flex-wrap: wrap;
+    }
+    .dot {
+      width: 16px; height: 16px;
+      border-radius: 999px;
+    }
+    .dot-success { background: var(--green); }
+    .dot-muted { background: var(--muted); }
+    .dot-orange { background: var(--orange); }
+    .dot-blue { background: var(--blue); }
+    .dot-red { background: var(--red); }
+    .responsive-table { overflow-x: auto; }
+    footer {
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid #ddd;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+<h1>SuperView</h1>
+<div class="subtitle">GitHub Stars 增长分析 &amp; 产品增长计划</div>
+
+<p style="font-size:16px;margin-bottom:32px;">基于 <code>designing-growth-loops</code> + <code>gtm-product-led-growth</code> + <code>copywriting</code> + <code>analytics</code> 四组技能框架的分析。</p>
+
+<!-- ============================================================ -->
+<h2>1. 项目特点 &amp; 最佳目标人群</h2>
+
+<h3>1.1 产品 DNA</h3>
+<table>
+  <tr><th>维度</th><th>详情</th></tr>
+  <tr><td>产品品类</td><td>AI 代理可观测性 / 开发者工具</td></tr>
+  <tr><td>差异化叙事</td><td>"Agent 黑匣子"——把 coding agent 的运行过程变成可 inspect、可 replay 的可视化界面</td></tr>
+  <tr><td>技术栈</td><td>本地优先（local-first）、SQLite、Electron desktop、Vite + React + Express</td></tr>
+  <tr><td>竞争对标</td><td>LangSmith、Langfuse、Braintrust、Helicone</td></tr>
+  <tr><td>核心亮点</td><td>对话式 thread + Context Replay mini-scene（FLIP 动画）+ 多 provider（Codex / Claude Code / OpenCode）</td></tr>
+</table>
+
+<h3>1.2 目标人群分层（按转化潜力排序）</h3>
+<table>
+  <tr><th>层级</th><th>画像</th><th>痛点</th><th>转化逻辑</th></tr>
+  <tr>
+    <td><span class="tag tag-green">T1</span></td>
+    <td><strong>Coding Agent 重度用户</strong><br>日均使用 Codex/Claude Code 的开发者，有 10+ 索引 session</td>
+    <td>不知道 agent 做了什么、为什么失败、token 花在哪、上下文怎么移的</td>
+    <td><span class="tag tag-green">刚需 + 即时价值</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-blue">T2</span></td>
+    <td><strong>AI 工具链构建者</strong><br>在 LangSmith / Braintrust 上做 eval 的开发者</td>
+    <td>现有工具太偏 cloud/enterprise，缺本地、直观的 replay</td>
+    <td><span class="tag tag-blue">替代品不够好</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-yellow">T3</span></td>
+    <td><strong>团队 TL / 工程经理</strong><br>管理 3-20 人使用 AI coding 的技术负责人</td>
+    <td>团队 agent 用法不可见，无法评估 ROI 和风险</td>
+    <td><span class="tag tag-yellow">管理视角刚需</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-purple">T4</span></td>
+    <td><strong>Agent 框架开发者</strong><br>构建 agent SDK/框架</td>
+    <td>需要一个通用的 agent log viewer 来 debug</td>
+    <td><span class="tag tag-purple">生态整合</span></td>
+  </tr>
+</table>
+
+<div class="callout">
+  <strong>核心 landing 区：T1 → T2。</strong>前期不追 enterprise（T4 edge）。产品入口必须 30 秒内让一个单独开发者感到 "wow"。
+</div>
+
+
+<!-- ============================================================ -->
+<h2>2. 增长计划</h2>
+
+<h3>2.1 核心增长飞轮</h3>
+
+<div class="card">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;text-align:center;">
+    <div><span class="dot dot-blue"></span> 发现 SuperView</div>
+    <div>→</div>
+    <div><span class="dot dot-orange"></span> 跑一次 scan</div>
+    <div>→</div>
+    <div><span class="dot dot-success"></span> 看到 agent timeline 的 <strong>wow moment</strong></div>
+    <div style="width:100%;height:1px;background:#eee;margin:4px 0;"></div>
+    <div><span class="dot dot-orange"></span> 分享截图/GIF</div>
+    <div>←</div>
+    <div><span class="dot dot-success"></span> 感到惊艳，replay + inspect 细节</div>
+    <div style="width:100%;height:1px;background:#eee;margin:4px 0;"></div>
+    <div>朋友/同事看到 → 也想看自己的 agent 日志 → 安装 SuperView</div>
+    <div>↓</div>
+    <div><span class="dot dot-blue"></span> [回到 loop 起点]</div>
+  </div>
+</div>
+
+<p><strong>关键洞见：</strong>产品最好的"自然分享时刻"是 <strong>Context Replay 的 mini-scene dot 动画 GIF</strong>。"I have never seen a coding agent from this angle" 就是产品最有力的 viral 引擎。每一个让用户产生这个感觉的瞬间，都应该能一键导出为可分享的素材。</p>
+
+<h3>2.2 渠道策略</h3>
+<table>
+  <tr><th>优先级</th><th>渠道</th><th>战术</th><th>预期 ROI</th></tr>
+  <tr>
+    <td><span class="tag tag-green">P0</span></td>
+    <td>GitHub README</td>
+    <td>首图必须是 Context Replay mini-scene 动画 GIF，配文案 "Watch your agent's black box in action"</td>
+    <td><span class="star">★★★★★</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-green">P0</span></td>
+    <td>Hacker News / 技术社区</td>
+    <td>Launch post 围绕 "I built a black box for Claude Code" 叙事，附完整 replay GIF</td>
+    <td><span class="star">★★★★★</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-blue">P1</span></td>
+    <td>X/Twitter 开发者圈</td>
+    <td>15s demo video（录 mini-scene replay 动画），带 repo link</td>
+    <td><span class="star">★★★★☆</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-blue">P1</span></td>
+    <td>GitHub Trending</td>
+    <td>README 质量 + star 增速 → 自然上 trending</td>
+    <td><span class="star">★★★★☆</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-yellow">P2</span></td>
+    <td>Dev.to / 工程博客</td>
+    <td>"How I built an agent black box" 技术深度文（DESIGN.md → 实现全流程）</td>
+    <td><span class="star">★★★☆☆</span></td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-yellow">P2</span></td>
+    <td>Reddit (r/MachineLearning, r/programming)</td>
+    <td>Showcase post + 评论互动</td>
+    <td><span class="star">★★★☆☆</span></td>
+  </tr>
+</table>
+
+<h3>2.3 产品端增长（PLG 框架）</h3>
+
+<p>SuperView 完美符合 PLG 条件：</p>
+<ul>
+  <li>✅ <strong>5 分钟内展示价值：</strong><code>pnpm install && pnpm dev && 点 Scan</code> → 3 分钟看到自己的 agent 旅程</li>
+  <li>✅ <strong>实现成本为零：</strong>无需注册、无需 API key、无需配置文件</li>
+  <li>✅ <strong>单人价值不依赖团队：</strong>个人开发者立刻获得洞察</li>
+  <li>✅ <strong>边际成本为零：</strong>每多一个用户，分享产生的内容可触达 N 个潜在用户</li>
+</ul>
+
+<table>
+  <tr><th>PLG 动因</th><th>执行细节</th></tr>
+  <tr><td>零摩擦 onboarding</td><td>README 第一条命令后直接看到数据，无需配置、无需 key、无需注册</td></tr>
+  <tr><td>内置 "分享" 功能</td><td>加一个导出当前 timeline / replay 为截图或 deck 的按钮</td></tr>
+  <tr><td>激活率衡量</td><td>安装后 5 分钟内完成一次项目扫描 = 已激活</td></tr>
+  <tr><td>病毒系数</td><td>每个用户在 5 分钟内产生一个可分享的"wow 截图"</td></tr>
+</table>
+
+
+<!-- ============================================================ -->
+<h2>3. 功能建议（增减）</h2>
+
+<h3>3.1 当前 MVP 功能审计</h3>
+<div class="responsive-table">
+<table>
+  <tr><th>功能</th><th>状态</th><th>Stars 影响</th><th>建议</th></tr>
+  <tr>
+    <td>Conversation thread</td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★★★</span></td>
+    <td>保留</td>
+  </tr>
+  <tr>
+    <td><strong>Context Replay（mini-scene + FLIP）</strong></td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★★★★★</span></td>
+    <td><strong>核心卖点，继续打磨</strong></td>
+  </tr>
+  <tr>
+    <td>Electron desktop</td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★★</span></td>
+    <td>保留，非增长重心</td>
+  </tr>
+  <tr>
+    <td>多 provider 支持</td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★★★★</span></td>
+    <td>保留</td>
+  </tr>
+  <tr>
+    <td>Token 用量 + KV 命中率</td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★★</span></td>
+    <td>保留</td>
+  </tr>
+  <tr>
+    <td>Theme 系统（4 套）</td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★</span></td>
+    <td>可有可无，保留 light/dark 即可</td>
+  </tr>
+  <tr>
+    <td>Auto-replay / polling</td>
+    <td><span class="tag tag-green">已有</span></td>
+    <td><span class="star">★★★</span></td>
+    <td>保留</td>
+  </tr>
+</table>
+</div>
+
+<h3 style="color:var(--green)">✅ 建议立即增加</h3>
+<table>
+  <tr><th>功能</th><th>理由</th><th>优先级</th></tr>
+  <tr>
+    <td><strong>一键导出 share card</strong></td>
+    <td>增长飞轮的燃料。加 "Share" 按钮 → 生成包含 project name + agent provider + 关键指标 + mini-scene dot 图的卡片</td>
+    <td><span class="tag tag-red">P0</span></td>
+  </tr>
+  <tr>
+    <td><strong>CLI quickstart</strong><br><code>curl -fsSL superview.dev/install.sh | bash</code></td>
+    <td>不需要 clone repo。一行命令安装</td>
+    <td><span class="tag tag-red">P0</span></td>
+  </tr>
+  <tr>
+    <td><strong>Public compare page</strong><br><code>superview.dev/s/&lt;encoded-snapshot&gt;</code></td>
+    <td>零后端（前端 decode）、零账号。让分享真正可点开看</td>
+    <td><span class="tag tag-blue">P1</span></td>
+  </tr>
+  <tr>
+    <td><strong>Agent failure visualization</strong></td>
+    <td>HN 最爱的内容——"my agent failed and I can see exactly why"。突出 failure path</td>
+    <td><span class="tag tag-blue">P1</span></td>
+  </tr>
+  <tr>
+    <td><strong>README + landing page 重写</strong></td>
+    <td>当前太功能列表，缺 screaming value prop。见 4.1</td>
+    <td><span class="tag tag-red">P0</span></td>
+  </tr>
+</table>
+
+<h3 style="color:var(--red)">❌ 建议裁剪</h3>
+<table>
+  <tr><th>功能</th><th>理由</th></tr>
+  <tr>
+    <td>Ingest gamification（马里奥 loader / coins / 关卡）</td>
+    <td>与 "developer tool" 身份冲突，可能劝退严肃用户。移到隐藏配置或删掉</td>
+  </tr>
+  <tr>
+    <td>Forest / Plasma 主题</td>
+    <td>开发成本 vs star impact 接近零。保留 light/dark 即可</td>
+  </tr>
+</table>
+
+
+<!-- ============================================================ -->
+<h2>4. 其他必要补充</h2>
+
+<h3>4.1 README 重写方案</h3>
+
+<p>当前 README 的痛：开头太功能列表，不够性感。缺少一个让人在 3 秒内想 clone 的 hook。</p>
+
+<div class="callout">
+  <strong>创意方向：</strong>README 首屏 = 一张 Context Replay 动画 GIF + 一行字。不解释功能，只展示魔法。
+</div>
+
+<pre># SuperView — The Black Box For Your Coding Agent
+
+**One command to see how every Claude Code, Codex, and OpenCode session actually ran.**
+
+[GIF: Context Replay mini-scene 动画播放全过程]
+
+---
+
+## 30-second wow
+
+```bash
+npx superview scan
+open http://localhost:5173
+```
+
+Click any task → Context Replay → watch your agent's black box in action.
+
+---
+
+## Privacy
+
+First. Local. Always.</pre>
+
+<h3>4.2 Launch 时间线</h3>
+<table>
+  <tr><th>阶段</th><th>时间</th><th>行动</th></tr>
+  <tr><td>Pre-launch</td><td>2 周</td><td>完善 share card + CLI；README 重写；录 15s demo video</td></tr>
+  <tr><td>Launch day</td><td>2 周后</td><td>HN post + X/Twitter 同步 + Reddit r/programming</td></tr>
+  <tr><td>Week 1-4</td><td>上线后</td><td>追 HN 评论反馈；修 bug；观察 GitHub Trending</td></tr>
+  <tr><td>Month 2</td><td>稳定期</td><td>v0.2 + 功能 roadmap post；Dev.to 深度文</td></tr>
+</table>
+
+<h3>4.3 Launch Post 大纲</h3>
+<div class="card">
+  <p><strong>标题：</strong><em>"I built a black box for Claude Code"</em></p>
+  <p><strong>第一句：</strong>"Have you ever wondered what your coding agent was actually thinking — or where all those tokens went?"</p>
+  <p><strong>正文节奏：</strong>三张截图（timeline → conversation → context replay）+ 一个 GIF</p>
+  <p><strong>结尾：</strong>快速入门 + GitHub link + "star if you found it useful"</p>
+</div>
+
+<h3>4.4 Analytics（30 天目标）</h3>
+<table>
+  <tr><th>指标</th><th>目标（Launch + 30d）</th></tr>
+  <tr><td>GitHub Stars</td><td><strong>300-500</strong></td></tr>
+  <tr><td>Clone / Install</td><td>2,000 - 5,000</td></tr>
+  <tr><td>社区贡献（PR / Issues）</td><td>10-30</td></tr>
+</table>
+
+<p>主目标：Stars。因为 Stars → visibility → more stars——这是纯开源的增长飞轮。</p>
+
+<h3>4.5 DeepSeek Model 命名</h3>
+<p>当前 model 名称显示为 <code>deepseek-v4-flash</code>。建议统一为 <strong>"DeepSeek V4 Flash"</strong>，让非中文用户一眼认出这不是拼写错误。</p>
+
+<div class="callout">
+  <strong>一句话总结：</strong>把最 "wow" 的时刻（Context Replay 动画）变成一张可分享的卡片。剩下的增长会自然发生。
+</div>
+
+<footer>
+  使用 superpowers skills: designing-growth-loops · gtm-product-led-growth · copywriting · analytics
+  <br>Generated for SuperView · 2026-06-14
+</footer>
+
+</div>
+</body>
+</html>
