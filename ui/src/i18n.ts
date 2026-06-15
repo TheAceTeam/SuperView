@@ -216,6 +216,16 @@ export type AppCopy = {
     modelSpendCached: string;
     modelSpendCost: string;
     modelSpendTotal: string;
+    recapToggle: string;
+    recapRhythmHeading: string;
+    recapDailyActivity: string;
+    recapWhenYouShip: string;
+    recapEfficiencyHeading: string;
+    recapCacheHit: string;
+    recapErrorRate: string;
+    recapTokensPerSession: string;
+    recapCostPerSession: string;
+    recapEmpty: string;
   };
   evidence: {
     heading: string;
@@ -453,7 +463,17 @@ export const COPY: Record<Language, AppCopy> = {
       modelSpendOutput: "Output",
       modelSpendCached: "Cached",
       modelSpendCost: "Cost",
-      modelSpendTotal: "Total"
+      modelSpendTotal: "Total",
+      recapToggle: "Session Recap",
+      recapRhythmHeading: "Rhythm",
+      recapDailyActivity: "daily activity",
+      recapWhenYouShip: "when you ship",
+      recapEfficiencyHeading: "Efficiency",
+      recapCacheHit: "Cache Hit Rate",
+      recapErrorRate: "Error Rate",
+      recapTokensPerSession: "Tokens / Session",
+      recapCostPerSession: "Cost / Session",
+      recapEmpty: "No session data to recap."
     },
     evidence: {
       heading: "Evidence",
@@ -724,7 +744,17 @@ export const COPY: Record<Language, AppCopy> = {
       modelSpendOutput: "输出",
       modelSpendCached: "缓存",
       modelSpendCost: "费用",
-      modelSpendTotal: "合计"
+      modelSpendTotal: "合计",
+      recapToggle: "会话概览",
+      recapRhythmHeading: "节奏",
+      recapDailyActivity: "日常活动",
+      recapWhenYouShip: "编码时段",
+      recapEfficiencyHeading: "效率",
+      recapCacheHit: "缓存命中率",
+      recapErrorRate: "错误率",
+      recapTokensPerSession: "Token / 会话",
+      recapCostPerSession: "费用 / 会话",
+      recapEmpty: "暂无会话数据。"
     },
     evidence: {
       heading: "证据",
