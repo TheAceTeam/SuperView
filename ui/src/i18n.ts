@@ -57,7 +57,7 @@ export type AppCopy = {
   topbar: { agentLogRoot: string; agentLogRootAria: string; agentLogRootPlaceholder: string; source: string; sourceAria: string; scan: string };
   title: { eyebrow: string; emptyProject: string; lead: string };
   projectControls: { provider: string; providerAria: string; project: string; projectAria: string; all: string; noProvider: string };
-  metrics: { projects: string; events: string; tasks: string; tokens: string; kvHit: string; showDailyTokens: string; hideDailyTokens: string; dailyUsageByDay: string };
+  metrics: { projects: string; events: string; tasks: string; tokens: string; kvHit: string; cost: string; showDailyTokens: string; hideDailyTokens: string; dailyUsageByDay: string };
   empty: {
     loadingTitle: string;
     loadingDetail: string;
@@ -186,6 +186,36 @@ export type AppCopy = {
     shareTimelineAria: string;
     shareStatsCompact: (tokens: string, duration: string, kv: string) => string;
     shareProviderUnknown: string;
+    readoutSessions: string;
+    readoutEstCost: string;
+    readoutTotalTokens: string;
+    readoutToolCalls: string;
+    readoutErrors: string;
+    pricingHeading: string;
+    pricingNote: string;
+    pricingInputRate: string;
+    pricingOutputRate: string;
+    toolUsageHeading: string;
+    toolUsageErrors: string;
+    toolUsageEmpty: string;
+    searchPlaceholder: string;
+    sortLabel: string;
+    sortNewest: string;
+    sortCost: string;
+    sortDuration: string;
+    sortTools: string;
+    sortErrors: string;
+    dropzoneHint: string;
+    dropzoneActive: string;
+    modelSpendHeading: string;
+    modelSpendEmpty: string;
+    modelSpendModel: string;
+    modelSpendMsgs: string;
+    modelSpendInput: string;
+    modelSpendOutput: string;
+    modelSpendCached: string;
+    modelSpendCost: string;
+    modelSpendTotal: string;
   };
   evidence: {
     heading: string;
@@ -254,6 +284,7 @@ export const COPY: Record<Language, AppCopy> = {
       tasks: "Tasks",
       tokens: "Tokens",
       kvHit: "KV hit",
+      cost: "Est. cost",
       showDailyTokens: "Show daily token usage chart",
       hideDailyTokens: "Hide daily token usage chart",
       dailyUsageByDay: "Daily usage by day"
@@ -392,7 +423,37 @@ export const COPY: Record<Language, AppCopy> = {
       shareVerdictRisks: (n: number) => `${n} risk signal${n === 1 ? "" : "s"} along the way`,
       shareTimelineAria: "Snapshot timeline by phase",
       shareStatsCompact: (tokens: string, duration: string, kv: string) => `${tokens} · ${duration} · KV ${kv}`,
-      shareProviderUnknown: "Coding agent"
+      shareProviderUnknown: "Coding agent",
+      readoutSessions: "Sessions",
+      readoutEstCost: "Est. Cost",
+      readoutTotalTokens: "Total Tokens",
+      readoutToolCalls: "Tool Calls",
+      readoutErrors: "Errors",
+      pricingHeading: "Token Rates & Cost Assumptions",
+      pricingNote: "Standard API rates, USD per 1M tokens. Anthropic: input + output + cached reads (×0.1) + cache writes (×1.25). Edit any field to recompute costs.",
+      pricingInputRate: "Input $/M",
+      pricingOutputRate: "Output $/M",
+      toolUsageHeading: "Tool Usage",
+      toolUsageErrors: "errors",
+      toolUsageEmpty: "No tool calls recorded for this user input.",
+      searchPlaceholder: "Search by title...",
+      sortLabel: "Sort",
+      sortNewest: "Newest first",
+      sortCost: "Highest cost",
+      sortDuration: "Longest duration",
+      sortTools: "Most tools",
+      sortErrors: "Most errors",
+      dropzoneHint: "Drop JSONL files here",
+      dropzoneActive: "Drop to import",
+      modelSpendHeading: "Spend by Model",
+      modelSpendEmpty: "No model usage data available.",
+      modelSpendModel: "Model",
+      modelSpendMsgs: "Msgs",
+      modelSpendInput: "Input",
+      modelSpendOutput: "Output",
+      modelSpendCached: "Cached",
+      modelSpendCost: "Cost",
+      modelSpendTotal: "Total"
     },
     evidence: {
       heading: "Evidence",
@@ -494,6 +555,7 @@ export const COPY: Record<Language, AppCopy> = {
       tasks: "任务",
       tokens: "Tokens",
       kvHit: "KV 命中",
+      cost: "估算费用",
       showDailyTokens: "显示按天 token 用量图",
       hideDailyTokens: "隐藏按天 token 用量图",
       dailyUsageByDay: "按天用量"
@@ -632,7 +694,37 @@ export const COPY: Record<Language, AppCopy> = {
       shareVerdictRisks: (n: number) => `沿途出现 ${n} 条风险信号`,
       shareTimelineAria: "按阶段排列的快照时间线",
       shareStatsCompact: (tokens: string, duration: string, kv: string) => `${tokens} · ${duration} · KV ${kv}`,
-      shareProviderUnknown: "编码 Agent"
+      shareProviderUnknown: "编码 Agent",
+      readoutSessions: "会话数",
+      readoutEstCost: "估算费用",
+      readoutTotalTokens: "总 Tokens",
+      readoutToolCalls: "工具调用",
+      readoutErrors: "错误数",
+      pricingHeading: "Token 费率与费用假设",
+      pricingNote: "标准 API 费率，USD / 1M tokens。Anthropic：输入 + 输出 + 缓存读取 (×0.1) + 缓存写入 (×1.25)。编辑任意字段重新计算费用。",
+      pricingInputRate: "输入 $/M",
+      pricingOutputRate: "输出 $/M",
+      toolUsageHeading: "工具用量",
+      toolUsageErrors: "错误",
+      toolUsageEmpty: "该用户输入未记录工具调用。",
+      searchPlaceholder: "按标题搜索...",
+      sortLabel: "排序",
+      sortNewest: "最新优先",
+      sortCost: "费用最高",
+      sortDuration: "时长最长",
+      sortTools: "工具最多",
+      sortErrors: "错误最多",
+      dropzoneHint: "拖拽 JSONL 文件到此处",
+      dropzoneActive: "松手导入",
+      modelSpendHeading: "按模型费用",
+      modelSpendEmpty: "无模型用量数据。",
+      modelSpendModel: "模型",
+      modelSpendMsgs: "消息数",
+      modelSpendInput: "输入",
+      modelSpendOutput: "输出",
+      modelSpendCached: "缓存",
+      modelSpendCost: "费用",
+      modelSpendTotal: "合计"
     },
     evidence: {
       heading: "证据",
