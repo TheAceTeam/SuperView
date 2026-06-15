@@ -1,5 +1,30 @@
-import { AlertTriangle, ArchiveX, Ban, ChartColumn, ChevronDown, Clock, FileText, Languages, Leaf, Moon, Pause, Play, RotateCw, Search, Share2, Sparkles, Sun } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  ArchiveX,
+  Ban,
+  ChartColumn,
+  ChevronDown,
+  Clock,
+  FileText,
+  Languages,
+  Leaf,
+  Moon,
+  Pause,
+  Play,
+  RotateCw,
+  Search,
+  Share2,
+  Sparkles,
+  Sun,
+} from "lucide-react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import type {
@@ -15,7 +40,7 @@ import type {
   TaskJourney,
   TaskJourneyDetail,
   TimelineEvent,
-  TokenUsage
+  TokenUsage,
 } from "../../core/types";
 import {
   fetchContextReplay,
@@ -26,12 +51,19 @@ import {
   fetchTimeline,
   ProjectWithSessions,
   resetDatabase,
-  startIngest
+  startIngest,
 } from "./api";
 import { DailyTokenUsagePanel } from "./DailyTokenUsagePanel";
 import { AppCopy, COPY, IngestCopy, Language, normalizeLanguage } from "./i18n";
 import { formatMillionTokens } from "./tokenFormat";
-import { aggregateCostByModel, DEFAULT_PRICING, estimateProjectCost, formatCost, ModelPricing } from "../../core/cost";
+import {
+  aggregateCostByModel,
+  DEFAULT_PRICING,
+  estimateProjectCost,
+  formatCost,
+  matchPricing,
+  ModelPricing,
+} from "../../core/cost";
 
 type Theme = "light" | "dark" | "forest" | "plasma";
 type ProjectProviderFilter = AgentProvider | "all";
@@ -44,7 +76,9 @@ const THEME_OPTIONS: Theme[] = ["light", "dark", "forest", "plasma"];
 
 function loadInitialTheme(): Theme {
   const stored = localStorage.getItem("superview-theme");
-  return stored && (THEME_OPTIONS as string[]).includes(stored) ? (stored as Theme) : "light";
+  return stored && (THEME_OPTIONS as string[]).includes(stored)
+    ? (stored as Theme)
+    : "light";
 }
 
 function ThemeIcon({ theme, size = 17 }: { theme: Theme; size?: number }) {
@@ -59,29 +93,47 @@ export function App() {
   const [themePanelOpen, setThemePanelOpen] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement | null>(null);
   const projectDropdownRef = useRef<HTMLDivElement | null>(null);
-  const [language, setLanguage] = useState<Language>(() => normalizeLanguage(localStorage.getItem("superview-language")));
+  const [language, setLanguage] = useState<Language>(() =>
+    normalizeLanguage(localStorage.getItem("superview-language")),
+  );
   const [projects, setProjects] = useState<ProjectWithSessions[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
   const [timeline, setTimeline] = useState<ProjectTimeline | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
-  const [dailyTokenUsage, setDailyTokenUsage] = useState<DailyTokenUsageResponse | null>(null);
+  const [dailyTokenUsage, setDailyTokenUsage] =
+    useState<DailyTokenUsageResponse | null>(null);
   const [dailyTokenUsageLoading, setDailyTokenUsageLoading] = useState(false);
   const [tokenChartExpanded, setTokenChartExpanded] = useState(false);
   const [tokenTimelineOpen, setTokenTimelineOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
-  const [journeyDetails, setJourneyDetails] = useState<Record<string, TaskJourneyDetail>>({});
-  const [journeyLoadingIds, setJourneyLoadingIds] = useState<Record<string, boolean>>({});
+  const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(
+    null,
+  );
+  const [journeyDetails, setJourneyDetails] = useState<
+    Record<string, TaskJourneyDetail>
+  >({});
+  const [journeyLoadingIds, setJourneyLoadingIds] = useState<
+    Record<string, boolean>
+  >({});
   const journeyLoadingRef = useRef(new Set<string>());
-  const [contextReplays, setContextReplays] = useState<Record<string, ContextReplayResponse>>({});
-  const [contextReplayLoadingIds, setContextReplayLoadingIds] = useState<Record<string, boolean>>({});
+  const [contextReplays, setContextReplays] = useState<
+    Record<string, ContextReplayResponse>
+  >({});
+  const [contextReplayLoadingIds, setContextReplayLoadingIds] = useState<
+    Record<string, boolean>
+  >({});
   const contextReplayLoadingRef = useRef(new Set<string>());
-  const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<Record<string, boolean>>({});
+  const [collapsedJourneyIds, setCollapsedJourneyIds] = useState<
+    Record<string, boolean>
+  >({});
   const [job, setJob] = useState<IngestJob | null>(null);
   const jobRef = useRef(job);
   jobRef.current = job;
   const jobClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [agentProvider, setAgentProvider] = useState<AgentProvider>("codex");
-  const [projectProviderFilter, setProjectProviderFilter] = useState<ProjectProviderFilter>("all");
+  const [projectProviderFilter, setProjectProviderFilter] =
+    useState<ProjectProviderFilter>("all");
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [agentLogRoot, setAgentLogRoot] = useState("");
   const [scanPanelOpen, setScanPanelOpen] = useState(false);
@@ -89,7 +141,9 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [dropzoneOpen, setDropzoneOpen] = useState(false);
   const dropzoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [pricing, setPricing] = useState<ModelPricing[]>(() => DEFAULT_PRICING.map(p => ({...p, test: p.test})));
+  const [pricing, setPricing] = useState<ModelPricing[]>(() =>
+    DEFAULT_PRICING.map((p) => ({ ...p, test: p.test })),
+  );
 
   const copy = COPY[language];
 
@@ -164,7 +218,10 @@ export function App() {
       setSelectedEvent(null);
       return;
     }
-    if (!selectedProjectId || !filtered.some((project) => project.id === selectedProjectId)) {
+    if (
+      !selectedProjectId ||
+      !filtered.some((project) => project.id === selectedProjectId)
+    ) {
       setSelectedProjectId(filtered[0].id);
     }
   }, [projects, projectProviderFilter, selectedProjectId]);
@@ -179,7 +236,8 @@ export function App() {
         try {
           const fresh = await fetchProjects();
           setProjects(fresh);
-          if (selectedProjectId) setDailyTokenUsage(await fetchDailyTokenUsage(selectedProjectId));
+          if (selectedProjectId)
+            setDailyTokenUsage(await fetchDailyTokenUsage(selectedProjectId));
         } catch {
           // silent
         }
@@ -198,8 +256,11 @@ export function App() {
     const uiTimer = window.setInterval(async () => {
       try {
         const [nextTimeline, nextTokens] = await Promise.all([
-          fetchTimeline(selectedProjectId, { limit: PROJECT_TIMELINE_LIMIT, offset: 0 }),
-          fetchDailyTokenUsage(selectedProjectId)
+          fetchTimeline(selectedProjectId, {
+            limit: PROJECT_TIMELINE_LIMIT,
+            offset: 0,
+          }),
+          fetchDailyTokenUsage(selectedProjectId),
         ]);
         setTimeline(nextTimeline);
         setDailyTokenUsage(nextTokens);
@@ -210,7 +271,9 @@ export function App() {
     const dbTimer = window.setInterval(async () => {
       if (isIngestBusy(jobRef.current)) return;
       try {
-        const jobId = await startIngest({ sources: [{ provider: agentProvider }] });
+        const jobId = await startIngest({
+          sources: [{ provider: agentProvider }],
+        });
         setJob(await fetchIngestJob(jobId));
       } catch {
         // silent
@@ -232,7 +295,12 @@ export function App() {
       }
     }
     function onDragLeave(event: DragEvent) {
-      if (!event.currentTarget || (event.relatedTarget && (event.currentTarget as Node).contains(event.relatedTarget as Node))) return;
+      if (
+        !event.currentTarget ||
+        (event.relatedTarget &&
+          (event.currentTarget as Node).contains(event.relatedTarget as Node))
+      )
+        return;
       dropzoneTimer.current = setTimeout(() => setDropzoneOpen(false), 150);
     }
     function onDrop(event: DragEvent) {
@@ -260,17 +328,24 @@ export function App() {
       try {
         const content = await file.text();
         const lines = content.trim().split("\n").filter(Boolean);
-        const jobId = await startIngest({ sources: [{ provider: "codex", path: file.name }] });
+        const jobId = await startIngest({
+          sources: [{ provider: "codex", path: file.name }],
+        });
         setJob(await fetchIngestJob(jobId));
         // queue a re-scan after the upload completes
         setTimeout(async () => {
           try {
             const fresh = await fetchProjects();
             setProjects(fresh);
-            if (selectedProjectId) setDailyTokenUsage(await fetchDailyTokenUsage(selectedProjectId));
-          } catch { /* silent */ }
+            if (selectedProjectId)
+              setDailyTokenUsage(await fetchDailyTokenUsage(selectedProjectId));
+          } catch {
+            /* silent */
+          }
         }, 3000);
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }
   }
 
@@ -282,7 +357,9 @@ export function App() {
       setSelectedProjectId((current) => current ?? next[0]?.id ?? null);
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      setError(
+        loadError instanceof Error ? loadError.message : String(loadError),
+      );
     } finally {
       setLoading(false);
     }
@@ -291,13 +368,18 @@ export function App() {
   async function loadTimeline(projectId: string) {
     setTimelineLoading(true);
     try {
-      const next = await fetchTimeline(projectId, { limit: PROJECT_TIMELINE_LIMIT, offset: 0 });
+      const next = await fetchTimeline(projectId, {
+        limit: PROJECT_TIMELINE_LIMIT,
+        offset: 0,
+      });
       setTimeline(next);
       setSelectedEvent(next.events[0] ?? null);
       setCollapsedJourneyIds({});
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      setError(
+        loadError instanceof Error ? loadError.message : String(loadError),
+      );
     } finally {
       setTimelineLoading(false);
     }
@@ -311,7 +393,9 @@ export function App() {
       setError(null);
     } catch (loadError) {
       setDailyTokenUsage(null);
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      setError(
+        loadError instanceof Error ? loadError.message : String(loadError),
+      );
     } finally {
       setDailyTokenUsageLoading(false);
     }
@@ -347,15 +431,25 @@ export function App() {
     setError(null);
     try {
       const root = agentLogRoot.trim();
-      const jobId = await startIngest(root ? { sources: [{ provider: agentProvider, root, path: root }] } : { sources: [{ provider: agentProvider }] });
+      const jobId = await startIngest(
+        root
+          ? { sources: [{ provider: agentProvider, root, path: root }] }
+          : { sources: [{ provider: agentProvider }] },
+      );
       setJob(await fetchIngestJob(jobId));
     } catch (scanError) {
-      setError(scanError instanceof Error ? scanError.message : String(scanError));
+      setError(
+        scanError instanceof Error ? scanError.message : String(scanError),
+      );
     }
   }
 
-  async function loadJourneyDetail(journeyId: string, projectId = selectedProjectId ?? undefined) {
-    if (journeyDetails[journeyId] || journeyLoadingRef.current.has(journeyId)) return;
+  async function loadJourneyDetail(
+    journeyId: string,
+    projectId = selectedProjectId ?? undefined,
+  ) {
+    if (journeyDetails[journeyId] || journeyLoadingRef.current.has(journeyId))
+      return;
     journeyLoadingRef.current.add(journeyId);
     setJourneyLoadingIds((current) => ({ ...current, [journeyId]: true }));
     try {
@@ -363,26 +457,43 @@ export function App() {
       setJourneyDetails((current) => ({ ...current, [journeyId]: detail }));
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      setError(
+        loadError instanceof Error ? loadError.message : String(loadError),
+      );
     } finally {
       journeyLoadingRef.current.delete(journeyId);
       setJourneyLoadingIds((current) => ({ ...current, [journeyId]: false }));
     }
   }
 
-  async function loadContextReplay(journeyId: string, projectId = selectedProjectId ?? undefined) {
-    if (contextReplays[journeyId] || contextReplayLoadingRef.current.has(journeyId)) return;
+  async function loadContextReplay(
+    journeyId: string,
+    projectId = selectedProjectId ?? undefined,
+  ) {
+    if (
+      contextReplays[journeyId] ||
+      contextReplayLoadingRef.current.has(journeyId)
+    )
+      return;
     contextReplayLoadingRef.current.add(journeyId);
-    setContextReplayLoadingIds((current) => ({ ...current, [journeyId]: true }));
+    setContextReplayLoadingIds((current) => ({
+      ...current,
+      [journeyId]: true,
+    }));
     try {
       const replay = await fetchContextReplay(journeyId, projectId);
       setContextReplays((current) => ({ ...current, [journeyId]: replay }));
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      setError(
+        loadError instanceof Error ? loadError.message : String(loadError),
+      );
     } finally {
       contextReplayLoadingRef.current.delete(journeyId);
-      setContextReplayLoadingIds((current) => ({ ...current, [journeyId]: false }));
+      setContextReplayLoadingIds((current) => ({
+        ...current,
+        [journeyId]: false,
+      }));
     }
   }
 
@@ -394,10 +505,18 @@ export function App() {
     });
   }
 
-  const filteredProjects = useMemo(() => filterProjectsByProvider(projects, projectProviderFilter), [projects, projectProviderFilter]);
-  const selectedProject = filteredProjects.find((project) => project.id === selectedProjectId) ?? null;
+  const filteredProjects = useMemo(
+    () => filterProjectsByProvider(projects, projectProviderFilter),
+    [projects, projectProviderFilter],
+  );
+  const selectedProject =
+    filteredProjects.find((project) => project.id === selectedProjectId) ??
+    null;
   const journeys = timeline?.taskJourneys ?? [];
-  const timelineEventsById = useMemo(() => new Map((timeline?.events ?? []).map((event) => [event.id, event])), [timeline]);
+  const timelineEventsById = useMemo(
+    () => new Map((timeline?.events ?? []).map((event) => [event.id, event])),
+    [timeline],
+  );
   const sessionMap = useMemo(() => {
     const map = new Map<string, SessionRecord>();
     for (const s of selectedProject?.sessions ?? []) {
@@ -406,10 +525,85 @@ export function App() {
     return map;
   }, [selectedProject?.sessions]);
   const totalEvents = timeline?.totalEvents ?? timeline?.events.length ?? 0;
-  const projectTokenUsage = selectedProject?.tokenUsage ?? timeline?.tokenUsage ?? ZERO_TOKEN_USAGE;
+  const projectTokenUsage =
+    selectedProject?.tokenUsage ?? timeline?.tokenUsage ?? ZERO_TOKEN_USAGE;
+  const recapSummaryLine = useMemo(() => {
+    if (journeys.length === 0) return null;
+    let totalCost = 0;
+    let totalMs = 0;
+    let minTs = Infinity;
+    let maxTs = -Infinity;
+    let priciestCost = 0;
+    let priciestName = "";
+    const dailyCost: Record<string, number> = {};
+    const modelBreakdown = aggregateCostByModel(journeys, sessionMap, pricing);
+    const favModel = modelBreakdown[0]?.label ?? "—";
+    for (const j of journeys) {
+      totalCost += estimateProjectCost(j.tokenUsage, undefined, pricing);
+      totalMs += j.durationMs ?? 0;
+      if (j.startedAt) {
+        const t = Date.parse(j.startedAt);
+        if (t < minTs) minTs = t;
+        if (t > maxTs) maxTs = t;
+        const dk = new Date(
+          new Date(j.startedAt).getFullYear(),
+          new Date(j.startedAt).getMonth(),
+          new Date(j.startedAt).getDate(),
+        ).toDateString();
+        dailyCost[dk] =
+          (dailyCost[dk] ?? 0) +
+          estimateProjectCost(j.tokenUsage, undefined, pricing);
+      }
+      const c = estimateProjectCost(j.tokenUsage, undefined, pricing);
+      if (c > priciestCost) {
+        priciestCost = c;
+        const cwd = sessionMap.get(j.sessionId)?.cwd;
+        priciestName = cwd
+          ? cwd
+              .replace(/\\/g, "/")
+              .split("/")
+              .filter(Boolean)
+              .slice(-2)
+              .join("/") || cwd
+          : "(unknown)";
+      }
+    }
+    const hours = totalMs / 3600000;
+    const spanDays =
+      isFinite(minTs) && isFinite(maxTs)
+        ? Math.max(1, Math.round((maxTs - minTs) / 86400000) + 1)
+        : 1;
+    let busyDay: { date: Date; cost: number } | null = null;
+    for (const [dk, cost] of Object.entries(dailyCost)) {
+      if (!busyDay || cost > busyDay.cost)
+        busyDay = { date: new Date(dk), cost };
+    }
+    return {
+      spanDays,
+      sessions: journeys.length,
+      cost: totalCost,
+      hours,
+      favModel,
+      busyDay,
+      priciestName,
+      priciestCost,
+    };
+  }, [journeys, pricing, sessionMap]);
   const ingestBusy = isIngestBusy(job);
-  const blockingMessage = getBlockingMessage({ copy, loading, timelineLoading, dailyTokenUsageLoading });
-  const blockingJob = getBlockingJob({ job, message: blockingMessage, ingestBusy, loading, timelineLoading, dailyTokenUsageLoading });
+  const blockingMessage = getBlockingMessage({
+    copy,
+    loading,
+    timelineLoading,
+    dailyTokenUsageLoading,
+  });
+  const blockingJob = getBlockingJob({
+    job,
+    message: blockingMessage,
+    ingestBusy,
+    loading,
+    timelineLoading,
+    dailyTokenUsageLoading,
+  });
 
   return (
     <div className="app-shell">
@@ -420,16 +614,34 @@ export function App() {
         </div>
         <div className="topbar-actions">
           <div className="scan-dropdown">
-            <button className="shell-button scan-dropdown-trigger" onClick={() => setScanPanelOpen((open) => !open)} disabled={ingestBusy} aria-expanded={scanPanelOpen} aria-controls="scan-agent-log-panel">
+            <button
+              className="shell-button scan-dropdown-trigger"
+              onClick={() => setScanPanelOpen((open) => !open)}
+              disabled={ingestBusy}
+              aria-expanded={scanPanelOpen}
+              aria-controls="scan-agent-log-panel"
+            >
               <RotateCw size={16} />
               {copy.topbar.scan}
               <ChevronDown size={15} aria-hidden="true" />
             </button>
             {scanPanelOpen ? (
-              <div className="scan-dropdown-panel" id="scan-agent-log-panel" role="region" aria-label={copy.topbar.scan}>
+              <div
+                className="scan-dropdown-panel"
+                id="scan-agent-log-panel"
+                role="region"
+                aria-label={copy.topbar.scan}
+              >
                 <label className="agent-provider-control">
                   <span>{copy.topbar.source}</span>
-                  <select aria-label={copy.topbar.sourceAria} value={agentProvider} onChange={(event) => setAgentProvider(event.target.value as AgentProvider)} disabled={ingestBusy}>
+                  <select
+                    aria-label={copy.topbar.sourceAria}
+                    value={agentProvider}
+                    onChange={(event) =>
+                      setAgentProvider(event.target.value as AgentProvider)
+                    }
+                    disabled={ingestBusy}
+                  >
                     <option value="codex">Codex</option>
                     <option value="claude-code">Claude Code</option>
                     <option value="opencode">OpenCode</option>
@@ -445,11 +657,23 @@ export function App() {
                     disabled={ingestBusy}
                   />
                 </label>
-                <button className="shell-button scan-dropdown-submit" onClick={handleScan} disabled={ingestBusy}>
+                <button
+                  className="shell-button scan-dropdown-submit"
+                  onClick={handleScan}
+                  disabled={ingestBusy}
+                >
                   <RotateCw size={16} />
                   {copy.topbar.scan}
                 </button>
-                <button className="shell-button" onClick={handleReset} style={{ marginTop: 4, fontSize: 11, color: "rgba(255,120,120,.8)" }}>
+                <button
+                  className="shell-button"
+                  onClick={handleReset}
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11,
+                    color: "rgba(255,120,120,.8)",
+                  }}
+                >
                   {copy.timeline.resetDatabase}
                 </button>
               </div>
@@ -468,21 +692,39 @@ export function App() {
             </button>
             {projectDropdownOpen ? (
               <div className="project-dropdown-panel">
-                <div className="project-dropdown-chips" role="group" aria-label={copy.projectControls.provider}>
-                  {(["all", "codex", "claude-code", "opencode"] as const).map((provider) => (
-                    <button
-                      key={provider}
-                      type="button"
-                      className={`project-dropdown-chip${projectProviderFilter === provider ? " active" : ""}`}
-                      onClick={() => setProjectProviderFilter(provider)}
-                    >
-                      {provider === "all" ? copy.projectControls.all : provider === "codex" ? "Codex" : provider === "claude-code" ? "Claude Code" : "OpenCode"}
-                    </button>
-                  ))}
+                <div
+                  className="project-dropdown-chips"
+                  role="group"
+                  aria-label={copy.projectControls.provider}
+                >
+                  {(["all", "codex", "claude-code", "opencode"] as const).map(
+                    (provider) => (
+                      <button
+                        key={provider}
+                        type="button"
+                        className={`project-dropdown-chip${projectProviderFilter === provider ? " active" : ""}`}
+                        onClick={() => setProjectProviderFilter(provider)}
+                      >
+                        {provider === "all"
+                          ? copy.projectControls.all
+                          : provider === "codex"
+                            ? "Codex"
+                            : provider === "claude-code"
+                              ? "Claude Code"
+                              : "OpenCode"}
+                      </button>
+                    ),
+                  )}
                 </div>
-                <div className="project-dropdown-list" role="listbox" aria-label={copy.projectControls.project}>
+                <div
+                  className="project-dropdown-list"
+                  role="listbox"
+                  aria-label={copy.projectControls.project}
+                >
                   {filteredProjects.length === 0 ? (
-                    <div className="project-dropdown-empty">{copy.empty.noProviderTitle}</div>
+                    <div className="project-dropdown-empty">
+                      {copy.empty.noProviderTitle}
+                    </div>
                   ) : (
                     filteredProjects.map((project) => (
                       <button
@@ -496,9 +738,12 @@ export function App() {
                           setProjectDropdownOpen(false);
                         }}
                       >
-                        <span className="project-dropdown-item-name">{project.name}</span>
+                        <span className="project-dropdown-item-name">
+                          {project.name}
+                        </span>
                         <span className="project-dropdown-item-meta">
-                          {formatMillionTokens(project.tokenUsage.total)} / KV {formatKvHitRate(project.tokenUsage)}
+                          {formatMillionTokens(project.tokenUsage.total)} / KV{" "}
+                          {formatKvHitRate(project.tokenUsage)}
                         </span>
                       </button>
                     ))
@@ -519,7 +764,11 @@ export function App() {
               <ThemeIcon theme={theme} />
             </button>
             {themePanelOpen ? (
-              <div className="theme-dropdown-panel" role="menu" aria-label={copy.theme.aria}>
+              <div
+                className="theme-dropdown-panel"
+                role="menu"
+                aria-label={copy.theme.aria}
+              >
                 {THEME_OPTIONS.map((option) => (
                   <button
                     key={option}
@@ -534,7 +783,13 @@ export function App() {
                   >
                     <ThemeIcon theme={option} size={15} />
                     <span>{copy.theme.names[option]}</span>
-                    {theme === option ? <i className="theme-dropdown-check" aria-hidden="true">✓</i> : <span aria-hidden="true" />}
+                    {theme === option ? (
+                      <i className="theme-dropdown-check" aria-hidden="true">
+                        ✓
+                      </i>
+                    ) : (
+                      <span aria-hidden="true" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -544,7 +799,9 @@ export function App() {
             className="shell-button language-toggle-button"
             aria-label={copy.language.aria}
             title={copy.language.title}
-            onClick={() => setLanguage((current) => (current === "en" ? "zh-CN" : "en"))}
+            onClick={() =>
+              setLanguage((current) => (current === "en" ? "zh-CN" : "en"))
+            }
           >
             <Languages size={16} />
             {copy.language.short}
@@ -559,52 +816,48 @@ export function App() {
             <h1>{selectedProject?.name ?? copy.title.emptyProject}</h1>
             <p className="lead">{copy.title.lead}</p>
           </div>
-          <div className="status-cluster">
-            <Metric metricKey="projects" label={copy.metrics.projects} value={filteredProjects.length} />
-            <Metric metricKey="events" label={copy.metrics.events} value={totalEvents} />
-            <Metric metricKey="tasks" label={copy.metrics.tasks} value={timeline?.taskJourneys.length ?? 0} />
-            <Metric
-              metricKey="tokens"
-              label={copy.metrics.tokens}
-              value={projectTokenUsage.total}
-              action={
-                selectedProject ? (
-                  <button
-                    className="metric-icon-button"
-                    type="button"
-                    aria-label={tokenChartExpanded ? copy.metrics.hideDailyTokens : copy.metrics.showDailyTokens}
-                    aria-expanded={tokenChartExpanded}
-                    onClick={() => setTokenChartExpanded((current) => !current)}
-                  >
-                    <ChartColumn size={15} />
-                  </button>
-                ) : null
-              }
-              overlay={
-                selectedProject && tokenChartExpanded ? (
-                  <DailyTokenUsagePanel
-                    copy={copy.tokenChart}
-                    data={dailyTokenUsage}
-                    loading={dailyTokenUsageLoading}
-                    title={copy.metrics.tokens}
-                    subtitle={copy.metrics.dailyUsageByDay}
-                    maxVisiblePoints={30}
-                    className="token-chart-panel--metric-popover"
-                    showHeaderToggle={false}
-                    expanded={tokenChartExpanded}
-                    onExpandedChange={setTokenChartExpanded}
-                  />
-                ) : null
-              }
-            />
-            <RatioMetric label={copy.metrics.kvHit} value={formatKvHitRate(projectTokenUsage)} />
-            <RatioMetric label={copy.metrics.cost} value={formatCost(estimateProjectCost(projectTokenUsage, undefined, pricing))} />
-          </div>
+          {recapSummaryLine ? (
+            <div className="recap-title-block">
+              <h2 className="recap-title-summary">
+                Across <em>{recapSummaryLine.spanDays}</em> day
+                {recapSummaryLine.spanDays !== 1 ? "s" : ""}, you ran{" "}
+                <em>{recapSummaryLine.sessions}</em> agent session
+                {recapSummaryLine.sessions !== 1 ? "s" : ""}, spent{" "}
+                <em>{formatCost(recapSummaryLine.cost)}</em>, and kept them
+                working for <em>{recapSummaryLine.hours.toFixed(1)}h</em>.
+              </h2>
+            </div>
+          ) : null}
         </section>
-        <PricingEditor pricing={pricing} onPricingChange={setPricing} copy={copy.timeline} />
+        {selectedProject ? (
+          <SessionRecapPanel
+            copy={copy.timeline}
+            metricsCopy={copy.metrics}
+            tokenChartCopy={copy.tokenChart}
+            journeys={journeys}
+            timelineEventsById={timelineEventsById}
+            dailyTokenUsage={dailyTokenUsage}
+            dailyTokenUsageLoading={dailyTokenUsageLoading}
+            sessionMap={sessionMap}
+            pricing={pricing}
+            onPricingChange={setPricing}
+          />
+        ) : null}
 
-        {error ? <div className="alert"><AlertTriangle size={16} />{error}</div> : null}
-        {blockingMessage ? <BlockingLoader copy={copy.loading} ingestCopy={copy.ingest} message={blockingMessage} job={blockingJob} /> : null}
+        {error ? (
+          <div className="alert">
+            <AlertTriangle size={16} />
+            {error}
+          </div>
+        ) : null}
+        {blockingMessage ? (
+          <BlockingLoader
+            copy={copy.loading}
+            ingestCopy={copy.ingest}
+            message={blockingMessage}
+            job={blockingJob}
+          />
+        ) : null}
 
         {loading ? (
           <EmptyState
@@ -662,10 +915,14 @@ export function App() {
                 loadingJourneyIds={journeyLoadingIds}
                 loadingContextReplayIds={contextReplayLoadingIds}
                 selectedEventId={selectedEvent?.id ?? null}
-                selectedProjectName={selectedProject?.name ?? ''}
+                selectedProjectName={selectedProject?.name ?? ""}
                 onToggleDetails={toggleJourneyDetails}
-                onLoadJourneyDetail={(journeyId) => loadJourneyDetail(journeyId)}
-                onLoadContextReplay={(journeyId) => loadContextReplay(journeyId)}
+                onLoadJourneyDetail={(journeyId) =>
+                  loadJourneyDetail(journeyId)
+                }
+                onLoadContextReplay={(journeyId) =>
+                  loadContextReplay(journeyId)
+                }
                 onSelectEvent={(event) => setSelectedEvent(event)}
                 tokenTimelineOpen={tokenTimelineOpen}
                 setTokenTimelineOpen={setTokenTimelineOpen}
@@ -677,9 +934,7 @@ export function App() {
       </main>
       {dropzoneOpen ? (
         <div className="dropzone-overlay" aria-hidden="true">
-          <div className="dropzone-message">
-            {copy.timeline.dropzoneActive}
-          </div>
+          <div className="dropzone-message">{copy.timeline.dropzoneActive}</div>
         </div>
       ) : null}
     </div>
@@ -695,9 +950,15 @@ function eventItemClass(event: TimelineEvent, selectedId: string | null) {
 function groupContextBlocks(blocks: ContextBlock[]) {
   return {
     added: blocks.filter((block) => block.state === "new"),
-    active: blocks.filter((block) => block.state === "retained" || block.state === "cited"),
-    changed: blocks.filter((block) => block.state === "changed" || block.state === "contradicted"),
-    dropped: blocks.filter((block) => block.state === "dropped" || block.state === "stale")
+    active: blocks.filter(
+      (block) => block.state === "retained" || block.state === "cited",
+    ),
+    changed: blocks.filter(
+      (block) => block.state === "changed" || block.state === "contradicted",
+    ),
+    dropped: blocks.filter(
+      (block) => block.state === "dropped" || block.state === "stale",
+    ),
   };
 }
 
@@ -729,7 +990,7 @@ function ConversationThread({
   onSelectEvent,
   tokenTimelineOpen,
   setTokenTimelineOpen,
-  sessionMap
+  sessionMap,
 }: {
   copy: AppCopy["timeline"];
   journeys: TaskJourney[];
@@ -752,24 +1013,38 @@ function ConversationThread({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("newest");
-  const orderedJourneys = useMemo(() => applySearchAndSort(journeys, searchQuery, sortKey, pricing), [journeys, searchQuery, sortKey, pricing]);
-  const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(null);
+  const orderedJourneys = useMemo(
+    () => applySearchAndSort(journeys, searchQuery, sortKey, pricing),
+    [journeys, searchQuery, sortKey, pricing],
+  );
+  const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(
+    null,
+  );
   const masterListRef = useRef<HTMLDivElement>(null);
   const [detailTab, setDetailTab] = useState<ThreadDetailTab>("context");
-  const selectedJourney = orderedJourneys.find((journey) => journey.id === selectedJourneyId) ?? orderedJourneys[0] ?? null;
+  const selectedJourney =
+    orderedJourneys.find((journey) => journey.id === selectedJourneyId) ??
+    orderedJourneys[0] ??
+    null;
 
   useEffect(() => {
     if (orderedJourneys.length === 0) {
       setSelectedJourneyId(null);
       return;
     }
-    setSelectedJourneyId((current) => (current && orderedJourneys.some((journey) => journey.id === current) ? current : orderedJourneys[0].id));
+    setSelectedJourneyId((current) =>
+      current && orderedJourneys.some((journey) => journey.id === current)
+        ? current
+        : orderedJourneys[0].id,
+    );
   }, [orderedJourneys]);
 
   // Scroll selected journey into view in the master list
   useEffect(() => {
     if (!selectedJourneyId || !masterListRef.current) return;
-    const item = masterListRef.current.querySelector<HTMLElement>(`[data-journey-id="${selectedJourneyId}"]`);
+    const item = masterListRef.current.querySelector<HTMLElement>(
+      `[data-journey-id="${selectedJourneyId}"]`,
+    );
     item?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [selectedJourneyId]);
 
@@ -780,7 +1055,11 @@ function ConversationThread({
   }, [detailTab, onLoadContextReplay, selectedJourney]);
 
   useEffect(() => {
-    if (detailTab !== "context" && selectedJourney && !collapsedJourneyIds[selectedJourney.id]) {
+    if (
+      detailTab !== "context" &&
+      selectedJourney &&
+      !collapsedJourneyIds[selectedJourney.id]
+    ) {
       onLoadJourneyDetail(selectedJourney.id);
     }
   }, [detailTab, onLoadJourneyDetail, selectedJourney, collapsedJourneyIds]);
@@ -789,25 +1068,30 @@ function ConversationThread({
     function shouldIgnoreShortcut(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName.toLowerCase();
-      return event.altKey
-        || event.ctrlKey
-        || event.metaKey
-        || tagName === "input"
-        || tagName === "textarea"
-        || tagName === "select"
-        || Boolean(target?.isContentEditable);
+      return (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        Boolean(target?.isContentEditable)
+      );
     }
 
     function handleJourneyKeyDown(event: KeyboardEvent) {
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
       if (shouldIgnoreShortcut(event)) return;
       if (orderedJourneys.length === 0) return;
-      const currentIndex = orderedJourneys.findIndex((journey) => journey.id === selectedJourney?.id);
+      const currentIndex = orderedJourneys.findIndex(
+        (journey) => journey.id === selectedJourney?.id,
+      );
       const baseIndex = currentIndex < 0 ? 0 : currentIndex;
       const lastIndex = orderedJourneys.length - 1;
-      const nextIndex = event.key === "ArrowDown"
-        ? Math.min(lastIndex, baseIndex + 1)
-        : Math.max(0, baseIndex - 1);
+      const nextIndex =
+        event.key === "ArrowDown"
+          ? Math.min(lastIndex, baseIndex + 1)
+          : Math.max(0, baseIndex - 1);
       if (nextIndex === currentIndex) {
         event.preventDefault();
         return;
@@ -825,14 +1109,29 @@ function ConversationThread({
   }
 
   return (
-    <div className="conversation-thread conversation-master-detail" aria-label={copy.aria}>
+    <div
+      className="conversation-thread conversation-master-detail"
+      aria-label={copy.aria}
+    >
       <aside className="conversation-master" aria-label={copy.masterAria}>
         <div className="conversation-master-heading">
           <span>{copy.masterTitle}</span>
-          <ul className="conversation-status-legend" aria-label={copy.statusLegendAria}>
-            <li className="running"><i aria-hidden="true" />{copy.statusLegendRunning}</li>
-            <li className="success"><i aria-hidden="true" />{copy.statusLegendSuccess}</li>
-            <li className="failed"><i aria-hidden="true" />{copy.statusLegendFailed}</li>
+          <ul
+            className="conversation-status-legend"
+            aria-label={copy.statusLegendAria}
+          >
+            <li className="running">
+              <i aria-hidden="true" />
+              {copy.statusLegendRunning}
+            </li>
+            <li className="success">
+              <i aria-hidden="true" />
+              {copy.statusLegendSuccess}
+            </li>
+            <li className="failed">
+              <i aria-hidden="true" />
+              {copy.statusLegendFailed}
+            </li>
           </ul>
           <strong>{orderedJourneys.length}</strong>
           <button
@@ -873,7 +1172,9 @@ function ConversationThread({
               key={journey.id}
               copy={copy}
               journey={journey}
-              fallbackPrompt={timelineEventsById.get(journey.promptEventId) ?? null}
+              fallbackPrompt={
+                timelineEventsById.get(journey.promptEventId) ?? null
+              }
               active={journey.id === selectedJourney?.id}
               loading={Boolean(loadingJourneyIds[journey.id])}
               timelineEventsById={timelineEventsById}
@@ -883,19 +1184,45 @@ function ConversationThread({
         </div>
       </aside>
 
-      <section className="conversation-detail-pane" aria-label={copy.detailsAria}>
-        <ReadoutDashboard journeys={orderedJourneys} copy={copy} timelineEventsById={timelineEventsById} />
+      <section
+        className="conversation-detail-pane"
+        aria-label={copy.detailsAria}
+      >
         <div className="conversation-detail-heading">
           <span>{copy.detailsTitle}</span>
           <strong>{selectedJourney?.title ?? copy.emptySelection}</strong>
         </div>
-        <ToolUsageBars tools={aggregateToolUsage(selectedJourney, timelineEventsById)} copy={copy} />
-        <ModelSpendTable journeys={orderedJourneys} sessionMap={sessionMap} pricing={pricing} copy={copy} />
-        <div className="thread-detail-tabs" role="tablist" aria-label={copy.detailTabsAria}>
-          <button type="button" role="tab" aria-selected={detailTab === "context"} className={detailTab === "context" ? "active" : ""} onClick={() => setDetailTab("context")}>
+        <ToolUsageBars
+          tools={aggregateToolUsage(selectedJourney, timelineEventsById)}
+          copy={copy}
+        />
+        <ModelSpendTable
+          journeys={orderedJourneys}
+          sessionMap={sessionMap}
+          pricing={pricing}
+          copy={copy}
+        />
+        <div
+          className="thread-detail-tabs"
+          role="tablist"
+          aria-label={copy.detailTabsAria}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={detailTab === "context"}
+            className={detailTab === "context" ? "active" : ""}
+            onClick={() => setDetailTab("context")}
+          >
             {copy.contextReplayTab}
           </button>
-          <button type="button" role="tab" aria-selected={detailTab === "conversation"} className={detailTab === "conversation" ? "active" : ""} onClick={() => setDetailTab("conversation")}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={detailTab === "conversation"}
+            className={detailTab === "conversation" ? "active" : ""}
+            onClick={() => setDetailTab("conversation")}
+          >
             {copy.conversationTab}
           </button>
         </div>
@@ -913,7 +1240,9 @@ function ConversationThread({
               copy={copy}
               journey={selectedJourney}
               detail={detailsByJourneyId[selectedJourney.id] ?? null}
-              fallbackPrompt={timelineEventsById.get(selectedJourney.promptEventId) ?? null}
+              fallbackPrompt={
+                timelineEventsById.get(selectedJourney.promptEventId) ?? null
+              }
               expanded={!collapsedJourneyIds[selectedJourney.id]}
               loading={Boolean(loadingJourneyIds[selectedJourney.id])}
               selectedEventId={selectedEventId}
@@ -926,11 +1255,23 @@ function ConversationThread({
         )}
       </section>
       {tokenTimelineOpen ? (
-        <div className="factory-overlay" onClick={() => setTokenTimelineOpen(false)}>
-          <div className="factory-overlay-panel" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="factory-overlay"
+          onClick={() => setTokenTimelineOpen(false)}
+        >
+          <div
+            className="factory-overlay-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="factory-overlay-header">
               <span>Token Timeline</span>
-              <button type="button" className="factory-overlay-close" onClick={() => setTokenTimelineOpen(false)}>✕</button>
+              <button
+                type="button"
+                className="factory-overlay-close"
+                onClick={() => setTokenTimelineOpen(false)}
+              >
+                ✕
+              </button>
             </div>
             <TokenTimeline
               copy={copy}
@@ -954,7 +1295,7 @@ function ConversationMasterItem({
   active,
   loading,
   timelineEventsById,
-  onSelect
+  onSelect,
 }: {
   copy: AppCopy["timeline"];
   journey: TaskJourney;
@@ -975,24 +1316,40 @@ function ConversationMasterItem({
     >
       <span>{formatDate(journey.startedAt, copy)}</span>
       <strong>{promptText}</strong>
-      {active ? <EventTape eventIds={journey.eventIds} timelineEventsById={timelineEventsById} /> : null}
+      {active ? (
+        <EventTape
+          eventIds={journey.eventIds}
+          timelineEventsById={timelineEventsById}
+        />
+      ) : null}
       <em>
-        {formatDuration(journey.durationMs)} · {formatMillionTokens(journey.tokenUsage.total)} {copy.tokens} · {copy.kvHit} {formatKvHitRate(journey.tokenUsage)}
+        {formatDuration(journey.durationMs)} ·{" "}
+        {formatMillionTokens(journey.tokenUsage.total)} {copy.tokens} ·{" "}
+        {copy.kvHit} {formatKvHitRate(journey.tokenUsage)}
       </em>
       {loading ? <small>{copy.loadingDetails}</small> : null}
     </button>
   );
 }
 
-function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
+function ContextReplayPanel({
+  copy,
+  replay,
+  loading,
+  selectedProjectName,
+}: {
   copy: AppCopy["timeline"];
   replay: ContextReplayResponse | null;
   loading: boolean;
   selectedProjectName: string;
 }) {
-  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(
+    null,
+  );
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const snapshotButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const snapshotButtonRefs = useRef<Record<string, HTMLButtonElement | null>>(
+    {},
+  );
   const ledgerContainerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -1017,7 +1374,10 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
     const panel = panelRef.current;
     if (!header || !panel) return;
     const apply = () => {
-      panel.style.setProperty("--replay-header-height", `${header.offsetHeight}px`);
+      panel.style.setProperty(
+        "--replay-header-height",
+        `${header.offsetHeight}px`,
+      );
     };
     apply();
     const observer = new ResizeObserver(apply);
@@ -1028,7 +1388,9 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
   function handleSelectBlock(id: string) {
     setSelectedBlockId(id);
     requestAnimationFrame(() => {
-      const card = ledgerContainerRef.current?.querySelector<HTMLElement>(`[data-block-id="${id}"]`);
+      const card = ledgerContainerRef.current?.querySelector<HTMLElement>(
+        `[data-block-id="${id}"]`,
+      );
       card?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }
@@ -1037,11 +1399,31 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
     setSelectedBlockId(null);
   }, [replay?.journey.id]);
 
-  const activeSnapshot = replay?.snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ?? replay?.snapshots[0] ?? null;
-  const activeSnapshotIndex = replay && activeSnapshot ? Math.max(0, replay.snapshots.findIndex((snapshot) => snapshot.id === activeSnapshot.id)) : -1;
-  const groups = useMemo(() => groupContextBlocks(activeSnapshot?.blocks ?? []), [activeSnapshot]);
-  const blockOriginSteps = useMemo(() => buildBlockOriginSteps(replay?.snapshots ?? []), [replay]);
-  const selectedBlock = activeSnapshot?.blocks.find((block) => block.id === selectedBlockId) ?? activeSnapshot?.blocks[0] ?? null;
+  const activeSnapshot =
+    replay?.snapshots.find((snapshot) => snapshot.id === selectedSnapshotId) ??
+    replay?.snapshots[0] ??
+    null;
+  const activeSnapshotIndex =
+    replay && activeSnapshot
+      ? Math.max(
+          0,
+          replay.snapshots.findIndex(
+            (snapshot) => snapshot.id === activeSnapshot.id,
+          ),
+        )
+      : -1;
+  const groups = useMemo(
+    () => groupContextBlocks(activeSnapshot?.blocks ?? []),
+    [activeSnapshot],
+  );
+  const blockOriginSteps = useMemo(
+    () => buildBlockOriginSteps(replay?.snapshots ?? []),
+    [replay],
+  );
+  const selectedBlock =
+    activeSnapshot?.blocks.find((block) => block.id === selectedBlockId) ??
+    activeSnapshot?.blocks[0] ??
+    null;
 
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [factoryOpen, setFactoryOpen] = useState(false);
@@ -1067,7 +1449,10 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
       setReplayPlaying(false);
       return;
     }
-    const timer = setTimeout(() => activateSnapshot(activeSnapshotIndex + 1), 2800);
+    const timer = setTimeout(
+      () => activateSnapshot(activeSnapshotIndex + 1),
+      2800,
+    );
     return () => clearTimeout(timer);
   }, [replayPlaying, activeSnapshotIndex, replay]);
 
@@ -1085,7 +1470,8 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
   function nextSnapshotIndexForKey(key: string) {
     if (!replay?.snapshots.length || activeSnapshotIndex < 0) return null;
     const lastIndex = replay.snapshots.length - 1;
-    if (key === "ArrowRight") return Math.min(lastIndex, activeSnapshotIndex + 1);
+    if (key === "ArrowRight")
+      return Math.min(lastIndex, activeSnapshotIndex + 1);
     if (key === "ArrowLeft") return Math.max(0, activeSnapshotIndex - 1);
     if (key === "Home") return 0;
     if (key === "End") return lastIndex;
@@ -1104,14 +1490,20 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
   useEffect(() => {
     setSelectedSnapshotId((current) => {
       if (!replay?.snapshots.length) return null;
-      return current && replay.snapshots.some((snapshot) => snapshot.id === current) ? current : replay.snapshots.at(-1)?.id ?? null;
+      return current &&
+        replay.snapshots.some((snapshot) => snapshot.id === current)
+        ? current
+        : (replay.snapshots.at(-1)?.id ?? null);
     });
   }, [replay]);
 
   useEffect(() => {
     setSelectedBlockId((current) => {
       if (!activeSnapshot?.blocks.length) return null;
-      return current && activeSnapshot.blocks.some((block) => block.id === current) ? current : activeSnapshot.blocks[0].id;
+      return current &&
+        activeSnapshot.blocks.some((block) => block.id === current)
+        ? current
+        : activeSnapshot.blocks[0].id;
     });
   }, [activeSnapshot]);
 
@@ -1119,13 +1511,15 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
     function shouldIgnoreShortcut(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName.toLowerCase();
-      return event.altKey
-        || event.ctrlKey
-        || event.metaKey
-        || tagName === "input"
-        || tagName === "textarea"
-        || tagName === "select"
-        || Boolean(target?.isContentEditable);
+      return (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        Boolean(target?.isContentEditable)
+      );
     }
 
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -1155,7 +1549,9 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
       const isPrev = lowered === "a" || lowered === "w";
       const isNext = lowered === "d" || lowered === "s";
       if (!isPrev && !isNext) return;
-      const currentBlockIndex = blocks.findIndex((block) => block.id === selectedBlockId);
+      const currentBlockIndex = blocks.findIndex(
+        (block) => block.id === selectedBlockId,
+      );
       const baseIndex = currentBlockIndex < 0 ? 0 : currentBlockIndex;
       const lastIndex = blocks.length - 1;
       const nextBlockIndex = isNext
@@ -1168,26 +1564,44 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
 
     document.addEventListener("keydown", handleGlobalKeyDown);
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [activeSnapshotIndex, replay, activeSnapshot, selectedBlockId, factoryOpen]);
+  }, [
+    activeSnapshotIndex,
+    replay,
+    activeSnapshot,
+    selectedBlockId,
+    factoryOpen,
+  ]);
 
   if (loading && !replay) {
     return (
-      <section className="context-replay-panel" aria-label={copy.contextReplayLedgerAria}>
-        <div className="context-replay-loading">{copy.contextReplayLoading}</div>
+      <section
+        className="context-replay-panel"
+        aria-label={copy.contextReplayLedgerAria}
+      >
+        <div className="context-replay-loading">
+          {copy.contextReplayLoading}
+        </div>
       </section>
     );
   }
 
   if (!replay || !activeSnapshot) {
     return (
-      <section className="context-replay-panel" aria-label={copy.contextReplayLedgerAria}>
+      <section
+        className="context-replay-panel"
+        aria-label={copy.contextReplayLedgerAria}
+      >
         <p className="muted">{copy.contextReplayEmpty}</p>
       </section>
     );
   }
 
   return (
-    <section ref={panelRef} className="context-replay-panel" aria-label={copy.contextReplayLedgerAria}>
+    <section
+      ref={panelRef}
+      className="context-replay-panel"
+      aria-label={copy.contextReplayLedgerAria}
+    >
       <div ref={headerRef} className="context-replay-header">
         <div className="context-replay-summary">
           <div>
@@ -1196,10 +1610,18 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
               <button
                 type="button"
                 className="replay-play-btn"
-                aria-label={replayPlaying ? copy.contextReplayAutoStop : copy.contextReplayAutoReplay}
+                aria-label={
+                  replayPlaying
+                    ? copy.contextReplayAutoStop
+                    : copy.contextReplayAutoReplay
+                }
                 onClick={() => {
-                  if (replayPlaying) { setReplayPlaying(false); return; }
-                  if (activeSnapshotIndex >= replay.snapshots.length - 1) activateSnapshot(0);
+                  if (replayPlaying) {
+                    setReplayPlaying(false);
+                    return;
+                  }
+                  if (activeSnapshotIndex >= replay.snapshots.length - 1)
+                    activateSnapshot(0);
                   setReplayPlaying(true);
                 }}
               >
@@ -1220,18 +1642,34 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
             <strong>{replay.journey.title}</strong>
             <p>{copy.contextReplayObserved}</p>
           </div>
-          <div className="context-replay-metrics" role="group" aria-label={copy.contextReplayLedgerAria}>
+          <div
+            className="context-replay-metrics"
+            role="group"
+            aria-label={copy.contextReplayLedgerAria}
+          >
             <div className="context-replay-metric">
               <span>{copy.contextReplayInput}</span>
-              <strong>{activeSnapshot.tokenUsage ? formatMillionTokens(activeSnapshot.tokenUsage.input) : "—"}</strong>
+              <strong>
+                {activeSnapshot.tokenUsage
+                  ? formatMillionTokens(activeSnapshot.tokenUsage.input)
+                  : "—"}
+              </strong>
             </div>
             <div className="context-replay-metric">
               <span>{copy.contextReplayOutput}</span>
-              <strong>{activeSnapshot.tokenUsage ? formatMillionTokens(activeSnapshot.tokenUsage.output) : "—"}</strong>
+              <strong>
+                {activeSnapshot.tokenUsage
+                  ? formatMillionTokens(activeSnapshot.tokenUsage.output)
+                  : "—"}
+              </strong>
             </div>
             <div className="context-replay-metric">
               <span>{copy.contextReplayTokenUsage}</span>
-              <strong>{activeSnapshot.tokenUsage ? formatMillionTokens(activeSnapshot.tokenUsage.total) : "—"}</strong>
+              <strong>
+                {activeSnapshot.tokenUsage
+                  ? formatMillionTokens(activeSnapshot.tokenUsage.total)
+                  : "—"}
+              </strong>
             </div>
             <div className="context-replay-metric">
               <span>{copy.contextReplayBlocks}</span>
@@ -1240,16 +1678,24 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
           </div>
         </div>
 
-        <div className="context-snapshot-rail" aria-label={copy.contextReplaySnapshotRail}>
+        <div
+          className="context-snapshot-rail"
+          aria-label={copy.contextReplaySnapshotRail}
+        >
           {replay.snapshots.map((snapshot, index) => (
-            <Tooltip key={snapshot.id} text={`${copy.contextReplayStep} ${index + 1}: ${snapshot.title}`}>
+            <Tooltip
+              key={snapshot.id}
+              text={`${copy.contextReplayStep} ${index + 1}: ${snapshot.title}`}
+            >
               <button
                 ref={(button) => {
                   snapshotButtonRefs.current[snapshot.id] = button;
                 }}
                 type="button"
                 className={snapshot.id === activeSnapshot.id ? "active" : ""}
-                aria-current={snapshot.id === activeSnapshot.id ? "step" : undefined}
+                aria-current={
+                  snapshot.id === activeSnapshot.id ? "step" : undefined
+                }
                 aria-label={`${copy.contextReplayStep} ${index + 1}: ${snapshot.title}`}
                 tabIndex={snapshot.id === activeSnapshot.id ? 0 : -1}
                 onClick={() => handleUserActivateSnapshot(index)}
@@ -1258,98 +1704,162 @@ function ContextReplayPanel({ copy, replay, loading, selectedProjectName }: {
                 <b className="context-snapshot-index">{index + 1}</b>
                 <span>{snapshot.phase}</span>
                 <strong>{snapshot.title}</strong>
-                <em>+{snapshot.addedBlockIds.length} / -{snapshot.droppedBlockIds.length}</em>
+                <em>
+                  +{snapshot.addedBlockIds.length} / -
+                  {snapshot.droppedBlockIds.length}
+                </em>
               </button>
             </Tooltip>
           ))}
         </div>
 
-        <span className="hotkey-hint" aria-hidden="true">{copy.hotkeyHint}</span>
+        <span className="hotkey-hint" aria-hidden="true">
+          {copy.hotkeyHint}
+        </span>
       </div>
 
       <div className="context-replay-body">
         <div className="context-replay-workspace">
           <div className="context-ledger-groups" ref={ledgerContainerRef}>
-          {activeSnapshot.warnings.length > 0 || replay.warnings.length > 0 ? (
-            <div className="context-warning-strip" aria-label={copy.contextReplayWarnings}>
-              {(activeSnapshot.warnings.length > 0 ? activeSnapshot.warnings : replay.warnings).map((warning) => (
-                <button
-                  type="button"
-                  className={`context-warning ${warning.severity}`}
-                  key={warning.id}
-                  disabled={warning.blockIds.length === 0}
-                  onClick={() => warning.blockIds[0] && handleSelectBlock(warning.blockIds[0])}
-                  title={warning.blockIds.length > 0 ? copy.contextReplayWarningJump : undefined}
-                >
-                  <span>{warning.severity}</span>
-                  <strong>{warning.title}</strong>
-                  <p>{warning.detail}</p>
-                </button>
-              ))}
+            {activeSnapshot.warnings.length > 0 ||
+            replay.warnings.length > 0 ? (
+              <div
+                className="context-warning-strip"
+                aria-label={copy.contextReplayWarnings}
+              >
+                {(activeSnapshot.warnings.length > 0
+                  ? activeSnapshot.warnings
+                  : replay.warnings
+                ).map((warning) => (
+                  <button
+                    type="button"
+                    className={`context-warning ${warning.severity}`}
+                    key={warning.id}
+                    disabled={warning.blockIds.length === 0}
+                    onClick={() =>
+                      warning.blockIds[0] &&
+                      handleSelectBlock(warning.blockIds[0])
+                    }
+                    title={
+                      warning.blockIds.length > 0
+                        ? copy.contextReplayWarningJump
+                        : undefined
+                    }
+                  >
+                    <span>{warning.severity}</span>
+                    <strong>{warning.title}</strong>
+                    <p>{warning.detail}</p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <ContextBlockGroup
+              copy={copy}
+              title={copy.contextReplayActiveContext}
+              blocks={groups.active}
+              blockOriginSteps={blockOriginSteps}
+              selectedBlockId={selectedBlock?.id ?? null}
+              onSelectBlock={handleDotOrBlockSelect}
+            />
+            <ContextBlockGroup
+              copy={copy}
+              title={copy.contextReplayAdded}
+              blocks={groups.added}
+              blockOriginSteps={blockOriginSteps}
+              selectedBlockId={selectedBlock?.id ?? null}
+              onSelectBlock={handleDotOrBlockSelect}
+            />
+            <ContextBlockGroup
+              copy={copy}
+              title={copy.contextReplayChanged}
+              blocks={groups.changed}
+              blockOriginSteps={blockOriginSteps}
+              selectedBlockId={selectedBlock?.id ?? null}
+              onSelectBlock={handleDotOrBlockSelect}
+            />
+            <ContextBlockGroup
+              copy={copy}
+              title={copy.contextReplayDropped}
+              blocks={groups.dropped}
+              blockOriginSteps={blockOriginSteps}
+              selectedBlockId={selectedBlock?.id ?? null}
+              onSelectBlock={handleDotOrBlockSelect}
+            />
+          </div>
+          {factoryOpen ? (
+            <div
+              className="factory-overlay"
+              onClick={() => setFactoryOpen(false)}
+            >
+              <div
+                className="factory-overlay-panel"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="factory-overlay-header">
+                  <span>Context Timeline</span>
+                  <button
+                    type="button"
+                    className="factory-overlay-close"
+                    onClick={() => setFactoryOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                <FactoryStrip
+                  copy={copy}
+                  snapshots={replay.snapshots}
+                  activeSnapshotId={activeSnapshot.id}
+                  activeSnapshotIndex={activeSnapshotIndex}
+                  blockOriginSteps={blockOriginSteps}
+                  selectedBlockId={selectedBlock?.id ?? null}
+                  onSelectBlock={handleDotOrBlockSelect}
+                  onActivateSnapshot={(index) => {
+                    handleUserActivateSnapshot(index);
+                  }}
+                />
+              </div>
             </div>
           ) : null}
-          <ContextBlockGroup copy={copy} title={copy.contextReplayActiveContext} blocks={groups.active} blockOriginSteps={blockOriginSteps} selectedBlockId={selectedBlock?.id ?? null} onSelectBlock={handleDotOrBlockSelect} />
-          <ContextBlockGroup copy={copy} title={copy.contextReplayAdded} blocks={groups.added} blockOriginSteps={blockOriginSteps} selectedBlockId={selectedBlock?.id ?? null} onSelectBlock={handleDotOrBlockSelect} />
-          <ContextBlockGroup copy={copy} title={copy.contextReplayChanged} blocks={groups.changed} blockOriginSteps={blockOriginSteps} selectedBlockId={selectedBlock?.id ?? null} onSelectBlock={handleDotOrBlockSelect} />
-          <ContextBlockGroup copy={copy} title={copy.contextReplayDropped} blocks={groups.dropped} blockOriginSteps={blockOriginSteps} selectedBlockId={selectedBlock?.id ?? null} onSelectBlock={handleDotOrBlockSelect} />
-        </div>
-        {factoryOpen ? (
-          <div className="factory-overlay" onClick={() => setFactoryOpen(false)}>
-            <div className="factory-overlay-panel" onClick={(e) => e.stopPropagation()}>
-              <div className="factory-overlay-header">
-                <span>Context Timeline</span>
-                <button type="button" className="factory-overlay-close" onClick={() => setFactoryOpen(false)}>✕</button>
-              </div>
-              <FactoryStrip
-                copy={copy}
-                snapshots={replay.snapshots}
-                activeSnapshotId={activeSnapshot.id}
-                activeSnapshotIndex={activeSnapshotIndex}
-                blockOriginSteps={blockOriginSteps}
-                selectedBlockId={selectedBlock?.id ?? null}
-                onSelectBlock={handleDotOrBlockSelect}
-                onActivateSnapshot={(index) => { handleUserActivateSnapshot(index); }}
-              />
+          {shareOpen ? (
+            <ShareCard
+              copy={copy}
+              replay={replay}
+              activeSnapshot={activeSnapshot}
+              activeSnapshotIndex={activeSnapshotIndex}
+              projectName={selectedProjectName}
+              onClose={() => setShareOpen(false)}
+              onCopy={showToast}
+            />
+          ) : null}
+
+          {toastMessage ? (
+            <div className="share-toast" role="status" aria-live="polite">
+              {toastMessage}
             </div>
-          </div>
-        ) : null}
-        {shareOpen ? (
-          <ShareCard
-            copy={copy}
-            replay={replay}
-            activeSnapshot={activeSnapshot}
-            activeSnapshotIndex={activeSnapshotIndex}
-            projectName={selectedProjectName}
-            onClose={() => setShareOpen(false)}
-            onCopy={showToast}
-          />
-        ) : null}
+          ) : null}
+        </div>
 
-        {toastMessage ? (
-          <div className="share-toast" role="status" aria-live="polite">
-            {toastMessage}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="context-mini-scene" aria-label={copy.contextReplayMiniSceneAria}>
-        <MiniScene
-          copy={copy}
-          blocks={activeSnapshot.blocks}
-          warnings={activeSnapshot.warnings}
-          blockOriginSteps={blockOriginSteps}
-          selectedBlockId={selectedBlock?.id ?? null}
-          onSelectBlock={handleDotOrBlockSelect}
-        />
-        <button
-          type="button"
-          className="factory-expand-btn"
-          aria-label="Context Timeline"
-          onClick={() => setFactoryOpen((o) => !o)}
+        <div
+          className="context-mini-scene"
+          aria-label={copy.contextReplayMiniSceneAria}
         >
-          <Clock size={13} />
-        </button>
-      </div>
+          <MiniScene
+            copy={copy}
+            blocks={activeSnapshot.blocks}
+            warnings={activeSnapshot.warnings}
+            blockOriginSteps={blockOriginSteps}
+            selectedBlockId={selectedBlock?.id ?? null}
+            onSelectBlock={handleDotOrBlockSelect}
+          />
+          <button
+            type="button"
+            className="factory-expand-btn"
+            aria-label="Context Timeline"
+            onClick={() => setFactoryOpen((o) => !o)}
+          >
+            <Clock size={13} />
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -1367,10 +1877,7 @@ interface HeroPick {
 /** Clean a snapshot title for display in the share card — strip raw commands and truncate. */
 function sanitizeShareTitle(title: string | null | undefined): string | null {
   if (!title) return null;
-  const cleaned = title
-    .replace(/['"`]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const cleaned = title.replace(/['"`]/g, "").replace(/\s+/g, " ").trim();
   // If the result looks like a shell command or JSON payload (>50% non-alpha chars), skip it
   const alpha = cleaned.replace(/[^a-zA-Z0-9一-鿿\s]/g, "").length;
   if (cleaned.length > 0 && alpha / cleaned.length < 0.4) return null;
@@ -1381,7 +1888,7 @@ function pickHeroStat(
   copy: AppCopy["timeline"],
   replay: ContextReplayResponse,
   failedStepIndex: number,
-  totalWarnings: number
+  totalWarnings: number,
 ): HeroPick {
   const journey = replay.journey;
   const usage = journey.tokenUsage;
@@ -1397,7 +1904,7 @@ function pickHeroStat(
       kind: "failed",
       stat: copy.shareHeroFailedStep(failedStepIndex + 1),
       caption: copy.shareCaptionFailed,
-      tone: "danger"
+      tone: "danger",
     };
   }
   if (totalWarnings >= 2) {
@@ -1405,7 +1912,7 @@ function pickHeroStat(
       kind: "risk",
       stat: copy.shareHeroRiskSignals(totalWarnings),
       caption: copy.shareCaptionRiskSignals,
-      tone: "danger"
+      tone: "danger",
     };
   }
   if (cacheRatio >= 0.7 && input > 0) {
@@ -1413,7 +1920,7 @@ function pickHeroStat(
       kind: "cache",
       stat: copy.shareHeroCacheHit(cachePct),
       caption: copy.shareCaptionCacheHit(formatMillionTokens(cached), steps),
-      tone: "success"
+      tone: "success",
     };
   }
   if (total >= 1_000_000) {
@@ -1421,7 +1928,7 @@ function pickHeroStat(
       kind: "tokens",
       stat: copy.shareHeroBigTokens(formatMillionTokens(total)),
       caption: copy.shareCaptionBigTokens(steps),
-      tone: "orange"
+      tone: "orange",
     };
   }
   if (journey.durationMs >= 10 * 60 * 1000) {
@@ -1429,14 +1936,14 @@ function pickHeroStat(
       kind: "duration",
       stat: copy.shareHeroLongRun(formatDuration(journey.durationMs)),
       caption: copy.shareCaptionLongRun(steps),
-      tone: "orange"
+      tone: "orange",
     };
   }
   return {
     kind: "default",
     stat: copy.shareHeroStepReplay(steps),
     caption: copy.shareCaptionStepReplay(formatDuration(journey.durationMs)),
-    tone: "orange"
+    tone: "orange",
   };
 }
 
@@ -1448,7 +1955,7 @@ const PHASE_TONES: Record<string, string> = {
   tool_result: "var(--success)",
   file_change: "var(--orange)",
   verification: "var(--success)",
-  response: "var(--success)"
+  response: "var(--success)",
 };
 
 function ShareCard({
@@ -1458,7 +1965,7 @@ function ShareCard({
   activeSnapshotIndex,
   projectName,
   onClose,
-  onCopy
+  onCopy,
 }: {
   copy: AppCopy["timeline"];
   replay: ContextReplayResponse;
@@ -1478,18 +1985,24 @@ function ShareCard({
   // Aggregate warnings across all snapshots + replay-level warnings (dedupe by id)
   const warningSet = new Map<string, true>();
   for (const w of replay.warnings) warningSet.set(w.id, true);
-  for (const snap of snapshots) for (const w of snap.warnings) warningSet.set(w.id, true);
+  for (const snap of snapshots)
+    for (const w of snap.warnings) warningSet.set(w.id, true);
   const totalWarnings = warningSet.size;
 
   // Find the failed snapshot index, if any (based on phase tone heuristic from journey.status)
-  const failedSnapshotIndex = journey.status === "failed" ? Math.max(0, snapshots.length - 1) : -1;
+  const failedSnapshotIndex =
+    journey.status === "failed" ? Math.max(0, snapshots.length - 1) : -1;
 
   const hero = pickHeroStat(copy, replay, failedSnapshotIndex, totalWarnings);
 
   // Story summary: use the full journey title (CSS wraps long text)
   const rawTitle = (journey.title ?? "").trim().replace(/\s+/g, " ");
   const fullTitle = rawTitle || activeSnapshot.title;
-  const storyLine = copy.shareStoryTemplate(providerLabel, snapshotCount, fullTitle);
+  const storyLine = copy.shareStoryTemplate(
+    providerLabel,
+    snapshotCount,
+    fullTitle,
+  );
 
   // Skills: top 3 unique by name
   const seenSkillNames = new Set<string>();
@@ -1500,7 +2013,8 @@ function ShareCard({
     topSkills.push(s.name);
     if (topSkills.length >= 3) break;
   }
-  const skillsLine = topSkills.length > 0 ? copy.shareSkillsUsed(topSkills.join(", ")) : null;
+  const skillsLine =
+    topSkills.length > 0 ? copy.shareSkillsUsed(topSkills.join(", ")) : null;
 
   // Verdict
   let verdictLabel: string;
@@ -1509,7 +2023,9 @@ function ShareCard({
   if (journey.status === "success") {
     verdictLabel = copy.shareVerdictCleared;
     verdictTone = "success";
-    const verificationSnap = [...snapshots].reverse().find((s) => s.phase === "verification");
+    const verificationSnap = [...snapshots]
+      .reverse()
+      .find((s) => s.phase === "verification");
     const cleanTitle = sanitizeShareTitle(verificationSnap?.title);
     verdictNote = cleanTitle
       ? `${copy.shareVerdictNoteCleared} (${cleanTitle})`
@@ -1519,7 +2035,9 @@ function ShareCard({
     verdictTone = "danger";
     const lastSnap = snapshots[snapshots.length - 1];
     const cleanTitle = sanitizeShareTitle(lastSnap?.title);
-    verdictNote = cleanTitle ? copy.shareVerdictNoteFailed(cleanTitle) : copy.shareCaptionFailed;
+    verdictNote = cleanTitle
+      ? copy.shareVerdictNoteFailed(cleanTitle)
+      : copy.shareCaptionFailed;
   } else {
     verdictLabel = copy.shareVerdictRunning;
     verdictTone = "orange";
@@ -1531,7 +2049,7 @@ function ShareCard({
   const compactStats = copy.shareStatsCompact(
     `${formatMillionTokens(journeyUsage?.total ?? 0)} ${copy.tokens}`,
     formatDuration(journey.durationMs),
-    kvPct
+    kvPct,
   );
 
   // Token sparkline data from per-snapshot totals
@@ -1539,7 +2057,8 @@ function ShareCard({
   const maxSnapshotTotal = Math.max(1, ...snapshotTotals);
 
   const now = new Date();
-  const verdictSign = verdictTone === "success" ? "+" : verdictTone === "danger" ? "x" : "~";
+  const verdictSign =
+    verdictTone === "success" ? "+" : verdictTone === "danger" ? "x" : "~";
 
   function buildPlainText() {
     const lines: string[] = [];
@@ -1554,8 +2073,12 @@ function ShareCard({
       lines.push(copy.shareVerdictRisks(totalWarnings));
     }
     lines.push("");
-    lines.push(`${snapshotCount} ${copy.contextReplayStep.toLowerCase()}s · ${compactStats}`);
-    lines.push(`${projectName || journey.projectId} · ${now.toLocaleDateString()}`);
+    lines.push(
+      `${snapshotCount} ${copy.contextReplayStep.toLowerCase()}s · ${compactStats}`,
+    );
+    lines.push(
+      `${projectName || journey.projectId} · ${now.toLocaleDateString()}`,
+    );
     return lines.join("\n");
   }
 
@@ -1577,9 +2100,13 @@ function ShareCard({
       lines.push(`> ${copy.shareVerdictRisks(totalWarnings)}`);
     }
     lines.push("");
-    lines.push(`\`${snapshotCount} ${copy.contextReplayStep.toLowerCase()}s · ${compactStats}\``);
+    lines.push(
+      `\`${snapshotCount} ${copy.contextReplayStep.toLowerCase()}s · ${compactStats}\``,
+    );
     lines.push("");
-    lines.push(`_${projectName || journey.projectId} · ${now.toLocaleDateString()} · SuperView_`);
+    lines.push(
+      `_${projectName || journey.projectId} · ${now.toLocaleDateString()} · SuperView_`,
+    );
     return lines.join("\n");
   }
 
@@ -1609,7 +2136,12 @@ function ShareCard({
             <strong>SuperView</strong>
             <span>{copy.shareCardTitle}</span>
           </div>
-          <button type="button" className="share-card-close" onClick={onClose} aria-label={copy.shareClose}>
+          <button
+            type="button"
+            className="share-card-close"
+            onClick={onClose}
+            aria-label={copy.shareClose}
+          >
             ✕
           </button>
         </div>
@@ -1622,27 +2154,42 @@ function ShareCard({
 
           <div className="share-card-story">
             <p className="share-card-story-line">{storyLine}</p>
-            {skillsLine ? <p className="share-card-story-skills">{skillsLine}</p> : null}
+            {skillsLine ? (
+              <p className="share-card-story-skills">{skillsLine}</p>
+            ) : null}
           </div>
 
-          <div className={`share-card-verdict share-card-verdict--${verdictTone}`}>
-            <span className="share-card-verdict-mark" aria-hidden="true">{verdictSign}</span>
+          <div
+            className={`share-card-verdict share-card-verdict--${verdictTone}`}
+          >
+            <span className="share-card-verdict-mark" aria-hidden="true">
+              {verdictSign}
+            </span>
             <span className="share-card-verdict-label">{verdictLabel}</span>
             <span className="share-card-verdict-note">{verdictNote}</span>
           </div>
 
-          {totalWarnings > 0 && hero.kind !== "risk" && hero.kind !== "failed" ? (
+          {totalWarnings > 0 &&
+          hero.kind !== "risk" &&
+          hero.kind !== "failed" ? (
             <div className="share-card-risks">
               <AlertTriangle size={12} aria-hidden="true" />
               <span>{copy.shareVerdictRisks(totalWarnings)}</span>
             </div>
           ) : null}
 
-          <div className="share-card-visual" role="img" aria-label={copy.shareTimelineAria}>
+          <div
+            className="share-card-visual"
+            role="img"
+            aria-label={copy.shareTimelineAria}
+          >
             <div className="share-card-spark">
               {snapshots.map((snap, idx) => {
                 const total = snapshotTotals[idx];
-                const height = Math.max(8, Math.round((total / maxSnapshotTotal) * 100));
+                const height = Math.max(
+                  8,
+                  Math.round((total / maxSnapshotTotal) * 100),
+                );
                 const color = PHASE_TONES[snap.phase] ?? "var(--orange)";
                 const isActive = idx === activeSnapshotIndex;
                 return (
@@ -1658,16 +2205,29 @@ function ShareCard({
           </div>
 
           <div className="share-card-stats-footer">
-            <span className="share-card-stats-compact">{snapshotCount} {copy.contextReplayStep.toLowerCase()}s · {compactStats}</span>
-            <span className="share-card-stats-project">{projectName || journey.projectId} · {now.toLocaleDateString()}</span>
+            <span className="share-card-stats-compact">
+              {snapshotCount} {copy.contextReplayStep.toLowerCase()}s ·{" "}
+              {compactStats}
+            </span>
+            <span className="share-card-stats-project">
+              {projectName || journey.projectId} · {now.toLocaleDateString()}
+            </span>
           </div>
         </div>
 
         <div className="share-card-actions">
-          <button type="button" className="share-card-btn" onClick={handleCopyPlain}>
+          <button
+            type="button"
+            className="share-card-btn"
+            onClick={handleCopyPlain}
+          >
             {copy.shareCopy}
           </button>
-          <button type="button" className="share-card-btn" onClick={handleCopyMarkdown}>
+          <button
+            type="button"
+            className="share-card-btn"
+            onClick={handleCopyMarkdown}
+          >
             {copy.shareCopyMarkdown}
           </button>
         </div>
@@ -1682,7 +2242,7 @@ function ContextBlockGroup({
   blocks,
   blockOriginSteps,
   selectedBlockId,
-  onSelectBlock
+  onSelectBlock,
 }: {
   copy: AppCopy["timeline"];
   title: string;
@@ -1714,15 +2274,26 @@ function ContextBlockGroup({
               <RetiredStateIcon state={block.state} />
               <span>{block.state}</span>
               <em>{block.type}</em>
-              <em>{copy.contextReplayFromStep(blockOriginSteps.get(block.id) ?? 1)}</em>
+              <em>
+                {copy.contextReplayFromStep(
+                  blockOriginSteps.get(block.id) ?? 1,
+                )}
+              </em>
             </div>
             <strong>{block.title}</strong>
             <p>{block.excerpt}</p>
             <div className="context-block-meta">
-              <span>{copy.contextReplaySource}: {block.sourcePath ?? block.sourceEventId ?? "inferred"}</span>
-              <span>{copy.contextReplayTokens}: {block.tokenEstimate}</span>
+              <span>
+                {copy.contextReplaySource}:{" "}
+                {block.sourcePath ?? block.sourceEventId ?? "inferred"}
+              </span>
+              <span>
+                {copy.contextReplayTokens}: {block.tokenEstimate}
+              </span>
             </div>
-            <small>{copy.contextReplayReason}: {block.reason}</small>
+            <small>
+              {copy.contextReplayReason}: {block.reason}
+            </small>
           </button>
         ))}
       </div>
@@ -1747,7 +2318,7 @@ function MiniScene({
   warnings,
   blockOriginSteps,
   selectedBlockId,
-  onSelectBlock
+  onSelectBlock,
 }: {
   copy: AppCopy["timeline"];
   blocks: ContextBlock[];
@@ -1757,7 +2328,9 @@ function MiniScene({
   onSelectBlock: (blockId: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const prevPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const prevPositions = useRef<Map<string, { x: number; y: number }>>(
+    new Map(),
+  );
   const lastBlocksRef = useRef<ContextBlock[]>(blocks);
 
   const { active, retired } = useMemo(() => {
@@ -1776,13 +2349,15 @@ function MiniScene({
     if (container) {
       const positions = new Map<string, { x: number; y: number }>();
       const rect = container.getBoundingClientRect();
-      for (const dot of container.querySelectorAll<HTMLElement>(".context-flow-dot")) {
+      for (const dot of container.querySelectorAll<HTMLElement>(
+        ".context-flow-dot",
+      )) {
         const blockId = dot.dataset.blockId;
         if (!blockId) continue;
         const dotRect = dot.getBoundingClientRect();
         positions.set(blockId, {
           x: dotRect.left - rect.left,
-          y: dotRect.top - rect.top
+          y: dotRect.top - rect.top,
         });
       }
       prevPositions.current = positions;
@@ -1800,7 +2375,9 @@ function MiniScene({
     const nextIds = new Set<string>();
 
     const movingDots: HTMLElement[] = [];
-    for (const dot of container.querySelectorAll<HTMLElement>(".context-flow-dot")) {
+    for (const dot of container.querySelectorAll<HTMLElement>(
+      ".context-flow-dot",
+    )) {
       const blockId = dot.dataset.blockId!;
       nextIds.add(blockId);
       const prev = prevPositions.current.get(blockId);
@@ -1822,9 +2399,13 @@ function MiniScene({
     if (movingDots.length > 0) container.offsetHeight;
 
     requestAnimationFrame(() => {
-      for (const dot of movingDots) { dot.style.transition = ""; }
+      for (const dot of movingDots) {
+        dot.style.transition = "";
+      }
       if (movingDots.length > 0) container.offsetHeight;
-      for (const dot of movingDots) { dot.style.transform = ""; }
+      for (const dot of movingDots) {
+        dot.style.transform = "";
+      }
     });
 
     for (const id of prevIds) {
@@ -1848,7 +2429,11 @@ function MiniScene({
   }, [blocks]);
 
   return (
-    <div ref={containerRef} className="context-mini-scene-inner" aria-label={copy.contextReplayMiniSceneAria}>
+    <div
+      ref={containerRef}
+      className="context-mini-scene-inner"
+      aria-label={copy.contextReplayMiniSceneAria}
+    >
       <MiniSceneLane
         kind="active"
         label={copy.contextReplayLaneActive}
@@ -1899,7 +2484,7 @@ function MiniSceneLane({
   blockOriginSteps,
   selectedBlockId,
   onSelectBlock,
-  copy
+  copy,
 }: {
   kind: "active" | "retired";
   label: string;
@@ -1942,7 +2527,7 @@ function FlowDot({
   originStep,
   onSelect,
   copy,
-  index
+  index,
 }: {
   block: ContextBlock;
   active: boolean;
@@ -1973,7 +2558,7 @@ function TokenTimeline({
   selectedProjectName,
   selectedJourneyId,
   onSelectJourney,
-  onClose
+  onClose,
 }: {
   copy: AppCopy["timeline"];
   journeys: TaskJourney[];
@@ -2000,19 +2585,37 @@ function TokenTimeline({
         peakJourney = j;
       }
     }
-    return { totalTokens, totalInput, totalOutput, totalCached, peakJourney, peakTotal, count: journeys.length };
+    return {
+      totalTokens,
+      totalInput,
+      totalOutput,
+      totalCached,
+      peakJourney,
+      peakTotal,
+      count: journeys.length,
+    };
   }, [journeys]);
 
   const maxTotal = Math.max(stats.peakTotal, 1);
-  const ordered = useMemo(() => [...journeys].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt)), [journeys]);
+  const ordered = useMemo(
+    () =>
+      [...journeys].sort(
+        (a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt),
+      ),
+    [journeys],
+  );
 
   return (
     <div className="token-timeline">
       <div className="token-timeline-summary">
-        <div className="token-timeline-summary-project">{selectedProjectName}</div>
+        <div className="token-timeline-summary-project">
+          {selectedProjectName}
+        </div>
         <div className="token-timeline-summary-stats">
           <div className="token-timeline-stat">
-            <span>{copy.statusLegendSuccess && "Conversations" || "Conversations"}</span>
+            <span>
+              {(copy.statusLegendSuccess && "Conversations") || "Conversations"}
+            </span>
             <strong>{stats.count}</strong>
           </div>
           <div className="token-timeline-stat">
@@ -2021,29 +2624,53 @@ function TokenTimeline({
           </div>
           <div className="token-timeline-stat">
             <span>Input</span>
-            <strong style={{ color: "var(--blue)" }}>{formatMillionTokens(stats.totalInput)}</strong>
+            <strong style={{ color: "var(--blue)" }}>
+              {formatMillionTokens(stats.totalInput)}
+            </strong>
           </div>
           <div className="token-timeline-stat">
             <span>Output</span>
-            <strong style={{ color: "var(--orange)" }}>{formatMillionTokens(stats.totalOutput)}</strong>
+            <strong style={{ color: "var(--orange)" }}>
+              {formatMillionTokens(stats.totalOutput)}
+            </strong>
           </div>
           <div className="token-timeline-stat">
             <span>Cached</span>
-            <strong style={{ color: "var(--success)" }}>{formatMillionTokens(stats.totalCached)}</strong>
+            <strong style={{ color: "var(--success)" }}>
+              {formatMillionTokens(stats.totalCached)}
+            </strong>
           </div>
         </div>
       </div>
 
       <div className="token-timeline-legend">
-        <span className="token-timeline-legend-item"><i className="seg input" />Input</span>
-        <span className="token-timeline-legend-item"><i className="seg output" />Output</span>
-        <span className="token-timeline-legend-item"><i className="seg cached" />Cached</span>
-        <span className="token-timeline-legend-item"><i className="seg reasoning" />Reasoning</span>
+        <span className="token-timeline-legend-item">
+          <i className="seg input" />
+          Input
+        </span>
+        <span className="token-timeline-legend-item">
+          <i className="seg output" />
+          Output
+        </span>
+        <span className="token-timeline-legend-item">
+          <i className="seg cached" />
+          Cached
+        </span>
+        <span className="token-timeline-legend-item">
+          <i className="seg reasoning" />
+          Reasoning
+        </span>
       </div>
 
       <div className="token-timeline-bars">
         {ordered.map((journey, index) => {
-          const usage = journey.tokenUsage ?? { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 };
+          const usage = journey.tokenUsage ?? {
+            input: 0,
+            output: 0,
+            reasoning: 0,
+            cachedInput: 0,
+            total: 0,
+          };
           const total = usage.total;
           const heightPx = Math.max(8, (total / maxTotal) * 160);
           const isSelected = journey.id === selectedJourneyId;
@@ -2067,13 +2694,38 @@ function TokenTimeline({
                 <div className="token-timeline-step">
                   <b>{index + 1}</b>
                 </div>
-                <div className="token-timeline-stack" style={{ height: `${heightPx}px` }}>
-                  {reasoningPct > 0 ? <div className="token-timeline-segment reasoning" style={{ height: `${reasoningPct}%` }} /> : null}
-                  {outputPct > 0 ? <div className="token-timeline-segment output" style={{ height: `${outputPct}%` }} /> : null}
-                  {cachedPct > 0 ? <div className="token-timeline-segment cached" style={{ height: `${cachedPct}%` }} /> : null}
-                  {inputPct > 0 ? <div className="token-timeline-segment input" style={{ height: `${inputPct}%` }} /> : null}
+                <div
+                  className="token-timeline-stack"
+                  style={{ height: `${heightPx}px` }}
+                >
+                  {reasoningPct > 0 ? (
+                    <div
+                      className="token-timeline-segment reasoning"
+                      style={{ height: `${reasoningPct}%` }}
+                    />
+                  ) : null}
+                  {outputPct > 0 ? (
+                    <div
+                      className="token-timeline-segment output"
+                      style={{ height: `${outputPct}%` }}
+                    />
+                  ) : null}
+                  {cachedPct > 0 ? (
+                    <div
+                      className="token-timeline-segment cached"
+                      style={{ height: `${cachedPct}%` }}
+                    />
+                  ) : null}
+                  {inputPct > 0 ? (
+                    <div
+                      className="token-timeline-segment input"
+                      style={{ height: `${inputPct}%` }}
+                    />
+                  ) : null}
                 </div>
-                <span className="token-timeline-label">{formatMillionTokens(total)}</span>
+                <span className="token-timeline-label">
+                  {formatMillionTokens(total)}
+                </span>
                 <span className="token-timeline-title">{journey.title}</span>
               </button>
             </Tooltip>
@@ -2092,7 +2744,7 @@ function FactoryStrip({
   blockOriginSteps,
   selectedBlockId,
   onSelectBlock,
-  onActivateSnapshot
+  onActivateSnapshot,
 }: {
   copy: AppCopy["timeline"];
   snapshots: ContextSnapshot[];
@@ -2108,18 +2760,28 @@ function FactoryStrip({
   useEffect(() => {
     const strip = stripRef.current;
     if (!strip) return;
-    const activeEl = strip.querySelector(`[data-station-index="${activeSnapshotIndex}"]`) as HTMLElement | null;
-    activeEl?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    const activeEl = strip.querySelector(
+      `[data-station-index="${activeSnapshotIndex}"]`,
+    ) as HTMLElement | null;
+    activeEl?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
   }, [activeSnapshotIndex]);
 
   return (
-    <div ref={stripRef} className="context-factory-strip" aria-label={copy.contextReplayMiniSceneAria}>
+    <div
+      ref={stripRef}
+      className="context-factory-strip"
+      aria-label={copy.contextReplayMiniSceneAria}
+    >
       {snapshots.map((snapshot, index) => {
         const activeBlocks = snapshot.blocks.filter(
-          (block) => block.state !== "dropped" && block.state !== "stale"
+          (block) => block.state !== "dropped" && block.state !== "stale",
         );
         const droppedBlocks = snapshot.blocks.filter(
-          (block) => block.state === "dropped" || block.state === "stale"
+          (block) => block.state === "dropped" || block.state === "stale",
         );
         const isActive = snapshot.id === activeSnapshotId;
         const isFirst = index === 0;
@@ -2162,7 +2824,7 @@ function FactoryStation({
   onSelectBlock,
   onActivate,
   copy,
-  isFirst
+  isFirst,
 }: {
   snapshot: ContextSnapshot;
   index: number;
@@ -2182,7 +2844,11 @@ function FactoryStation({
 
   return (
     <>
-      {!isFirst ? <div className="factory-station-connector"><span>→</span></div> : null}
+      {!isFirst ? (
+        <div className="factory-station-connector">
+          <span>→</span>
+        </div>
+      ) : null}
       <Wrapper
         type={active ? undefined : "button"}
         data-station-index={index}
@@ -2192,7 +2858,9 @@ function FactoryStation({
         aria-label={`${copy.contextReplayStep} ${index + 1}: ${snapshot.title}`}
         title={`${copy.contextReplayStep} ${index + 1}: ${snapshot.title}`}
       >
-        <div className="factory-station-prompt" title={snapshot.title}>{snapshot.title}</div>
+        <div className="factory-station-prompt" title={snapshot.title}>
+          {snapshot.title}
+        </div>
         <div className="factory-station-header">
           <span className="factory-station-phase">{snapshot.phase}</span>
           <b className="factory-station-index">{index + 1}</b>
@@ -2213,7 +2881,10 @@ function FactoryStation({
                 className={`factory-block-pill state-${block.state}${block.id === selectedBlockId ? " active" : ""}`}
                 title={`${block.title} · ${block.state} · ${copy.contextReplayFromStep(blockOriginSteps.get(block.id) ?? 1)}`}
                 aria-pressed={block.id === selectedBlockId}
-                onClick={(e) => { e.stopPropagation(); onSelectBlock(block.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectBlock(block.id);
+                }}
               >
                 {blockOriginSteps.get(block.id) ?? 1}
               </button>
@@ -2231,7 +2902,10 @@ function FactoryStation({
                 data-block-id={block.id}
                 className={`factory-block-pill dropped state-${block.state}`}
                 title={`${block.title} · ${block.state}`}
-                onClick={(e) => { e.stopPropagation(); onSelectBlock(block.id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectBlock(block.id);
+                }}
               >
                 {blockOriginSteps.get(block.id) ?? 1}
               </button>
@@ -2252,7 +2926,7 @@ function ConversationTurn({
   loading,
   selectedEventId,
   onToggleDetails,
-  onSelectEvent
+  onSelectEvent,
 }: {
   copy: AppCopy["timeline"];
   journey: TaskJourney;
@@ -2265,13 +2939,33 @@ function ConversationTurn({
   onSelectEvent: (event: TimelineEvent) => void;
 }) {
   const events = detail?.events ?? [];
-  const prompt = fallbackPrompt ?? events.find((event) => event.id === journey.promptEventId || event.kind === "user_prompt");
-  const assistantMessage = events.find((event) => event.kind === "assistant_message");
-  const backgroundEvents = events.filter((event) => event.kind !== "user_prompt" && event.id !== assistantMessage?.id);
-  const logEvents = events.filter((event) => event.kind === "tool_call" || event.kind === "tool_result" || event.kind === "file_change" || event.kind === "verification" || event.kind === "error");
+  const prompt =
+    fallbackPrompt ??
+    events.find(
+      (event) =>
+        event.id === journey.promptEventId || event.kind === "user_prompt",
+    );
+  const assistantMessage = events.find(
+    (event) => event.kind === "assistant_message",
+  );
+  const backgroundEvents = events.filter(
+    (event) =>
+      event.kind !== "user_prompt" && event.id !== assistantMessage?.id,
+  );
+  const logEvents = events.filter(
+    (event) =>
+      event.kind === "tool_call" ||
+      event.kind === "tool_result" ||
+      event.kind === "file_change" ||
+      event.kind === "verification" ||
+      event.kind === "error",
+  );
   const skills = aggregateSkills(journey.skills, events);
-  const agentOutput = assistantMessage?.detail ?? assistantMessage?.title ?? journey.summary;
-  const provider = prompt ? providerFromSessionId(prompt.sessionId) : providerFromSessionId(journey.sessionId);
+  const agentOutput =
+    assistantMessage?.detail ?? assistantMessage?.title ?? journey.summary;
+  const provider = prompt
+    ? providerFromSessionId(prompt.sessionId)
+    : providerFromSessionId(journey.sessionId);
   const agentLabel = labelForProvider(provider);
   const promptText = prompt?.detail ?? journey.title;
 
@@ -2282,8 +2976,12 @@ function ConversationTurn({
           <span>{copy.eventCount(journey.eventIds.length)}</span>
           <span>{formatExitType(journey.exitType, copy)}</span>
           <span>{formatDuration(journey.durationMs)}</span>
-          <span>{formatMillionTokens(journey.tokenUsage.total)} {copy.tokens}</span>
-          <span>{copy.kvHit} {formatKvHitRate(journey.tokenUsage)}</span>
+          <span>
+            {formatMillionTokens(journey.tokenUsage.total)} {copy.tokens}
+          </span>
+          <span>
+            {copy.kvHit} {formatKvHitRate(journey.tokenUsage)}
+          </span>
           {loading ? <span>{copy.loadingDetails}</span> : null}
         </div>
       </div>
@@ -2300,9 +2998,14 @@ function ConversationTurn({
       />
 
       <div className="message-row codex detail-message-row">
-        <span className="message-avatar" aria-hidden="true">{avatarForProvider(provider)}</span>
+        <span className="message-avatar" aria-hidden="true">
+          {avatarForProvider(provider)}
+        </span>
         <div className="message-stack">
-          <button className="conversation-message codex detail-toggle" onClick={onToggleDetails}>
+          <button
+            className="conversation-message codex detail-toggle"
+            onClick={onToggleDetails}
+          >
             <span className="message-meta">{copy.agentWork}</span>
             <span>{expanded ? copy.hideProcess : copy.viewProcess}</span>
           </button>
@@ -2314,16 +3017,29 @@ function ConversationTurn({
           <section>
             <div className="detail-section-heading">
               <span>{copy.backgroundWork}</span>
-              <em>{backgroundEvents.length} {copy.entries}</em>
+              <em>
+                {backgroundEvents.length} {copy.entries}
+              </em>
             </div>
             <div className="log-list">
               {backgroundEvents.length > 0 ? (
                 backgroundEvents.map((event) => (
-                  <button key={event.id} className={eventItemClass(event, selectedEventId)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
+                  <button
+                    key={event.id}
+                    className={eventItemClass(event, selectedEventId)}
+                    data-event-id={event.id}
+                    onClick={() => onSelectEvent(event)}
+                  >
                     <span>{event.kind}</span>
                     <strong>{event.title}</strong>
-                    {event.skills && event.skills.length > 0 ? <small>{copy.skills}: {formatSkillNames(event.skills)}</small> : null}
-                    <small>{event.detail ?? formatDate(event.timestamp, copy)}</small>
+                    {event.skills && event.skills.length > 0 ? (
+                      <small>
+                        {copy.skills}: {formatSkillNames(event.skills)}
+                      </small>
+                    ) : null}
+                    <small>
+                      {event.detail ?? formatDate(event.timestamp, copy)}
+                    </small>
                   </button>
                 ))
               ) : (
@@ -2335,16 +3051,31 @@ function ConversationTurn({
           <section>
             <div className="detail-section-heading">
               <span>{copy.log}</span>
-              <em>{logEvents.length} {copy.entries}</em>
+              <em>
+                {logEvents.length} {copy.entries}
+              </em>
             </div>
             <div className="log-list compact">
               {logEvents.length > 0 ? (
                 logEvents.map((event) => (
-                  <button key={event.id} className={eventItemClass(event, selectedEventId)} data-event-id={event.id} onClick={() => onSelectEvent(event)}>
+                  <button
+                    key={event.id}
+                    className={eventItemClass(event, selectedEventId)}
+                    data-event-id={event.id}
+                    onClick={() => onSelectEvent(event)}
+                  >
                     <span>{event.toolName ?? event.kind}</span>
                     <strong>{event.title}</strong>
-                    {event.skills && event.skills.length > 0 ? <small>{copy.skills}: {formatSkillNames(event.skills)}</small> : null}
-                    <small>{event.detail ?? event.callId ?? formatDate(event.timestamp, copy)}</small>
+                    {event.skills && event.skills.length > 0 ? (
+                      <small>
+                        {copy.skills}: {formatSkillNames(event.skills)}
+                      </small>
+                    ) : null}
+                    <small>
+                      {event.detail ??
+                        event.callId ??
+                        formatDate(event.timestamp, copy)}
+                    </small>
                   </button>
                 ))
               ) : (
@@ -2363,7 +3094,9 @@ function ConversationTurn({
         skills={skills}
         selected={assistantMessage?.id === selectedEventId}
         disabled={!assistantMessage}
-        onSelect={() => (assistantMessage ? onSelectEvent(assistantMessage) : undefined)}
+        onSelect={() =>
+          assistantMessage ? onSelectEvent(assistantMessage) : undefined
+        }
       />
     </article>
   );
@@ -2378,7 +3111,7 @@ function ChatBubble({
   skills = [],
   selected,
   disabled,
-  onSelect
+  onSelect,
 }: {
   copy: AppCopy["timeline"];
   variant: "user" | "codex";
@@ -2414,19 +3147,36 @@ function ChatBubble({
 
   return (
     <div className={`message-row ${variant}`}>
-      <span className="message-avatar" aria-hidden="true">{variant === "user" ? "U" : "C"}</span>
+      <span className="message-avatar" aria-hidden="true">
+        {variant === "user" ? "U" : "C"}
+      </span>
       <div className="message-stack">
-        <button className={`conversation-message ${variant} ${selected ? "selected" : ""}`} disabled={disabled} onClick={onSelect}>
+        <button
+          className={`conversation-message ${variant} ${selected ? "selected" : ""}`}
+          disabled={disabled}
+          onClick={onSelect}
+        >
           <span className="message-meta">{label}</span>
-          <div ref={bodyRef} className="message-body" data-expanded={expanded ? "true" : "false"}>
+          <div
+            ref={bodyRef}
+            className="message-body"
+            data-expanded={expanded ? "true" : "false"}
+          >
             {title ? <strong>{title}</strong> : null}
             <p>{text}</p>
           </div>
-          {skills.length > 0 ? <SkillChips copy={copy} skills={skills} /> : null}
-          {canExpand && !expanded ? <span className="message-fade" aria-hidden="true" /> : null}
+          {skills.length > 0 ? (
+            <SkillChips copy={copy} skills={skills} />
+          ) : null}
+          {canExpand && !expanded ? (
+            <span className="message-fade" aria-hidden="true" />
+          ) : null}
         </button>
         {canExpand ? (
-          <button className="message-expand-toggle" onClick={() => setExpanded((current) => !current)}>
+          <button
+            className="message-expand-toggle"
+            onClick={() => setExpanded((current) => !current)}
+          >
             {expanded ? copy.collapse : copy.expand}
           </button>
         ) : null}
@@ -2435,26 +3185,44 @@ function ChatBubble({
   );
 }
 
-function SkillChips({ copy, skills }: { copy: AppCopy["timeline"]; skills: SkillUsage[] }) {
+function SkillChips({
+  copy,
+  skills,
+}: {
+  copy: AppCopy["timeline"];
+  skills: SkillUsage[];
+}) {
   const uniqueSkills = dedupeSkills(skills);
   const visibleSkills = uniqueSkills.slice(0, 4);
   const remaining = Math.max(0, uniqueSkills.length - visibleSkills.length);
   return (
-    <div className="skill-chip-row" aria-label={`${copy.skills}: ${formatSkillNames(skills)}`}>
+    <div
+      className="skill-chip-row"
+      aria-label={`${copy.skills}: ${formatSkillNames(skills)}`}
+    >
       <span className="skill-chip-label">{copy.skills}</span>
       {visibleSkills.map((skill) => (
-        <span className="skill-chip" title={skill.excerpt || skill.path || skill.source} key={`${skill.name}-${skill.source}-${skill.path ?? ""}`}>
+        <span
+          className="skill-chip"
+          title={skill.excerpt || skill.path || skill.source}
+          key={`${skill.name}-${skill.source}-${skill.path ?? ""}`}
+        >
           {skill.name}
         </span>
       ))}
-      {remaining > 0 ? <span className="skill-chip more">+{remaining}</span> : null}
+      {remaining > 0 ? (
+        <span className="skill-chip more">+{remaining}</span>
+      ) : null}
     </div>
   );
 }
 
 function Tooltip({ text, children }: { text: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [position, setPosition] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
   const wrapperRef = useRef<HTMLSpanElement>(null);
 
   function show() {
@@ -2488,17 +3256,33 @@ function Tooltip({ text, children }: { text: string; children: ReactNode }) {
       {children}
       {open && text
         ? createPortal(
-            <div className="app-tooltip" style={{ top: position.top, left: position.left }} role="tooltip">
+            <div
+              className="app-tooltip"
+              style={{ top: position.top, left: position.left }}
+              role="tooltip"
+            >
               {text}
             </div>,
-            document.body
+            document.body,
           )
         : null}
     </span>
   );
 }
 
-function Metric({ metricKey, label, value, action, overlay }: { metricKey: MetricKey; label: string; value: number; action?: ReactNode; overlay?: ReactNode }) {
+function Metric({
+  metricKey,
+  label,
+  value,
+  action,
+  overlay,
+}: {
+  metricKey: MetricKey;
+  label: string;
+  value: number;
+  action?: ReactNode;
+  overlay?: ReactNode;
+}) {
   return (
     <div className="metric">
       <span>{label}</span>
@@ -2518,10 +3302,28 @@ function RatioMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BlockingLoader({ copy, ingestCopy, message, job }: { copy: AppCopy["loading"]; ingestCopy: IngestCopy; message: string; job?: IngestJob | null }) {
-  const percent = job && job.totalFiles > 0 ? Math.round((job.processedFiles / job.totalFiles) * 100) : 0;
+function BlockingLoader({
+  copy,
+  ingestCopy,
+  message,
+  job,
+}: {
+  copy: AppCopy["loading"];
+  ingestCopy: IngestCopy;
+  message: string;
+  job?: IngestJob | null;
+}) {
+  const percent =
+    job && job.totalFiles > 0
+      ? Math.round((job.processedFiles / job.totalFiles) * 100)
+      : 0;
   return (
-    <div className="blocking-loader" role="status" aria-live="polite" aria-label={copy.aria}>
+    <div
+      className="blocking-loader"
+      role="status"
+      aria-live="polite"
+      aria-label={copy.aria}
+    >
       <div className="blocking-loader-card">
         <div className="blocking-loader-message">
           <span className="blocking-loader-icon" aria-hidden="true" />
@@ -2536,9 +3338,15 @@ function BlockingLoader({ copy, ingestCopy, message, job }: { copy: AppCopy["loa
               <i style={{ width: `${percent}%` }} />
             </div>
             <div className="blocking-loader-progress-meta">
-              <span>{ingestCopy.phase}: {job.phase}</span>
-              <span>{job.processedFiles}/{job.totalFiles} {ingestCopy.files}</span>
-              <span>{ingestCopy.events}: {job.totalEvents}</span>
+              <span>
+                {ingestCopy.phase}: {job.phase}
+              </span>
+              <span>
+                {job.processedFiles}/{job.totalFiles} {ingestCopy.files}
+              </span>
+              <span>
+                {ingestCopy.events}: {job.totalEvents}
+              </span>
             </div>
           </div>
         ) : null}
@@ -2558,7 +3366,7 @@ function EmptyState({
   onScan,
   scanLabel,
   placeholder,
-  disabled = false
+  disabled = false,
 }: {
   copy: AppCopy["empty"];
   title: string;
@@ -2579,7 +3387,14 @@ function EmptyState({
       <p>{detail}</p>
       <label className="empty-agent-provider">
         <span>{copy.source}</span>
-        <select aria-label={copy.sourceAria} value={agentProvider} onChange={(event) => onAgentProviderChange(event.target.value as AgentProvider)} disabled={disabled}>
+        <select
+          aria-label={copy.sourceAria}
+          value={agentProvider}
+          onChange={(event) =>
+            onAgentProviderChange(event.target.value as AgentProvider)
+          }
+          disabled={disabled}
+        >
           <option value="codex">Codex</option>
           <option value="claude-code">Claude Code</option>
           <option value="opencode">OpenCode</option>
@@ -2587,24 +3402,50 @@ function EmptyState({
       </label>
       <label className="empty-agent-root">
         <span>{copy.root}</span>
-        <input aria-label={copy.rootAria} value={agentLogRoot} onChange={(event) => onAgentLogRootChange(event.target.value)} placeholder={placeholder} disabled={disabled} />
+        <input
+          aria-label={copy.rootAria}
+          value={agentLogRoot}
+          onChange={(event) => onAgentLogRootChange(event.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+        />
       </label>
-      <button className="primary-button" onClick={onScan} disabled={disabled}>{scanLabel}</button>
+      <button className="primary-button" onClick={onScan} disabled={disabled}>
+        {scanLabel}
+      </button>
     </section>
   );
 }
 
-function aggregateSkills(journeySkills: SkillUsage[] | undefined, events: TimelineEvent[]) {
-  return dedupeSkills([...(journeySkills ?? []), ...events.flatMap((event) => event.skills ?? [])]);
+function aggregateSkills(
+  journeySkills: SkillUsage[] | undefined,
+  events: TimelineEvent[],
+) {
+  return dedupeSkills([
+    ...(journeySkills ?? []),
+    ...events.flatMap((event) => event.skills ?? []),
+  ]);
 }
 
-function filterProjectsByProvider(projects: ProjectWithSessions[], provider: ProjectProviderFilter) {
+function filterProjectsByProvider(
+  projects: ProjectWithSessions[],
+  provider: ProjectProviderFilter,
+) {
   if (provider === "all") return projects;
-  return projects.filter((project) => project.sessions.some((session) => session.provider === provider || session.id.startsWith(`${provider}:`)));
+  return projects.filter((project) =>
+    project.sessions.some(
+      (session) =>
+        session.provider === provider || session.id.startsWith(`${provider}:`),
+    ),
+  );
 }
 
 function providerSummary(project: ProjectWithSessions, copy: AppCopy) {
-  const providers = new Set(project.sessions.map((session) => session.provider ?? providerFromSessionId(session.id)));
+  const providers = new Set(
+    project.sessions.map(
+      (session) => session.provider ?? providerFromSessionId(session.id),
+    ),
+  );
   if (providers.size === 0) return copy.projectControls.noProvider;
   return [...providers].map(labelForProvider).join("+");
 }
@@ -2618,10 +3459,15 @@ function dedupeSkills(skills: SkillUsage[]) {
 }
 
 function formatSkillNames(skills: SkillUsage[]) {
-  return dedupeSkills(skills).map((skill) => skill.name).join(", ");
+  return dedupeSkills(skills)
+    .map((skill) => skill.name)
+    .join(", ");
 }
 
-function formatExitType(exitType: TaskJourney["exitType"], copy: AppCopy["timeline"]) {
+function formatExitType(
+  exitType: TaskJourney["exitType"],
+  copy: AppCopy["timeline"],
+) {
   return exitType === "next_prompt" ? copy.nextInput : copy.sessionEnd;
 }
 
@@ -2655,7 +3501,9 @@ function formatDuration(durationMs: number) {
   if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.round(seconds % 60);
-  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+  return remainingSeconds > 0
+    ? `${minutes}m ${remainingSeconds}s`
+    : `${minutes}m`;
 }
 
 function formatKvHitRate(usage: TokenUsage) {
@@ -2667,7 +3515,9 @@ function formatKvHitRate(usage: TokenUsage) {
 }
 
 function formatMetricValue(metricKey: MetricKey, value: number) {
-  return metricKey === "tokens" ? formatMillionTokens(value) : value.toLocaleString();
+  return metricKey === "tokens"
+    ? formatMillionTokens(value)
+    : value.toLocaleString();
 }
 
 function isIngestBusy(job: IngestJob | null) {
@@ -2678,7 +3528,7 @@ function getBlockingMessage({
   copy,
   loading,
   timelineLoading,
-  dailyTokenUsageLoading
+  dailyTokenUsageLoading,
 }: {
   copy: AppCopy;
   loading: boolean;
@@ -2697,7 +3547,7 @@ function getBlockingJob({
   ingestBusy,
   loading,
   timelineLoading,
-  dailyTokenUsageLoading
+  dailyTokenUsageLoading,
 }: {
   job: IngestJob | null;
   message: string | null;
@@ -2708,13 +3558,22 @@ function getBlockingJob({
 }) {
   if (!message) return null;
   if (ingestBusy && job) return job;
-  if (loading) return createLoaderJob("loading-projects", "scanning", 3, 12, message);
-  if (timelineLoading) return createLoaderJob("loading-timeline", "normalizing", 7, 12, message);
-  if (dailyTokenUsageLoading) return createLoaderJob("loading-token-usage", "parsing", 5, 12, message);
+  if (loading)
+    return createLoaderJob("loading-projects", "scanning", 3, 12, message);
+  if (timelineLoading)
+    return createLoaderJob("loading-timeline", "normalizing", 7, 12, message);
+  if (dailyTokenUsageLoading)
+    return createLoaderJob("loading-token-usage", "parsing", 5, 12, message);
   return createLoaderJob("loading-superview", "scanning", 4, 12, message);
 }
 
-function createLoaderJob(id: string, phase: IngestJob["phase"], processedFiles: number, totalFiles: number, currentFile: string): IngestJob {
+function createLoaderJob(
+  id: string,
+  phase: IngestJob["phase"],
+  processedFiles: number,
+  totalFiles: number,
+  currentFile: string,
+): IngestJob {
   return {
     id,
     status: "running",
@@ -2730,7 +3589,7 @@ function createLoaderJob(id: string, phase: IngestJob["phase"], processedFiles: 
     changedFiles: processedFiles,
     processedBytes: 0,
     totalBytes: 0,
-    currentFile
+    currentFile,
   };
 }
 
@@ -2742,13 +3601,17 @@ interface ToolUsageItem {
   errors: number;
 }
 
-function aggregateToolUsage(journey: TaskJourney | null, timelineEventsById: Map<string, TimelineEvent>): ToolUsageItem[] {
+function aggregateToolUsage(
+  journey: TaskJourney | null,
+  timelineEventsById: Map<string, TimelineEvent>,
+): ToolUsageItem[] {
   if (!journey) return [];
   const map = new Map<string, { count: number; errors: number }>();
   for (const eventId of journey.eventIds) {
     const event = timelineEventsById.get(eventId);
     if (!event) continue;
-    const toolName = event.toolName || (event.kind === "tool_call" ? event.title : null);
+    const toolName =
+      event.toolName || (event.kind === "tool_call" ? event.title : null);
     if (!toolName) continue;
     const entry = map.get(toolName) ?? { count: 0, errors: 0 };
     entry.count++;
@@ -2764,7 +3627,10 @@ function aggregateJourneyErrors(journeys: TaskJourney[]): number {
   return journeys.filter((j) => j.status === "failed").length;
 }
 
-function aggregateJourneyToolCalls(journeys: TaskJourney[], timelineEventsById: Map<string, TimelineEvent>): number {
+function aggregateJourneyToolCalls(
+  journeys: TaskJourney[],
+  timelineEventsById: Map<string, TimelineEvent>,
+): number {
   let count = 0;
   for (const j of journeys) {
     for (const eventId of j.eventIds) {
@@ -2777,10 +3643,20 @@ function aggregateJourneyToolCalls(journeys: TaskJourney[], timelineEventsById: 
 
 // ── ToolUsageBars ──
 
-function ToolUsageBars({ tools, copy }: { tools: ToolUsageItem[]; copy: AppCopy["timeline"] }) {
+function ToolUsageBars({
+  tools,
+  copy,
+}: {
+  tools: ToolUsageItem[];
+  copy: AppCopy["timeline"];
+}) {
   const [expanded, setExpanded] = useState(false);
   if (tools.length === 0) {
-    return <section className="tool-usage-bars"><p className="muted">{copy.toolUsageEmpty}</p></section>;
+    return (
+      <section className="tool-usage-bars">
+        <p className="muted">{copy.toolUsageEmpty}</p>
+      </section>
+    );
   }
   const maxCount = Math.max(...tools.map((t) => t.count));
   const visible = expanded ? tools : tools.slice(0, 5);
@@ -2788,17 +3664,26 @@ function ToolUsageBars({ tools, copy }: { tools: ToolUsageItem[]; copy: AppCopy[
     <section className="tool-usage-bars" aria-label={copy.toolUsageHeading}>
       <div className="detail-section-heading">
         <span>{copy.toolUsageHeading}</span>
-        <span style={{ color: "var(--muted)", fontSize: 10, fontWeight: 800 }}>{tools.length}</span>
+        <span style={{ color: "var(--muted)", fontSize: 10, fontWeight: 800 }}>
+          {tools.length}
+        </span>
       </div>
       <div className="tool-usage-list">
         {visible.map((tool) => (
           <div key={tool.name} className="tool-usage-row">
             <span className="tool-usage-name">{tool.name}</span>
             <span className="tool-usage-track">
-              <span className="tool-usage-fill" style={{ width: `${(tool.count / maxCount) * 100}%` }} />
+              <span
+                className="tool-usage-fill"
+                style={{ width: `${(tool.count / maxCount) * 100}%` }}
+              />
             </span>
             <span className="tool-usage-count">{tool.count}</span>
-            {tool.errors > 0 ? <span className="tool-usage-errors">{tool.errors} {copy.toolUsageErrors}</span> : null}
+            {tool.errors > 0 ? (
+              <span className="tool-usage-errors">
+                {tool.errors} {copy.toolUsageErrors}
+              </span>
+            ) : null}
           </div>
         ))}
       </div>
@@ -2808,7 +3693,9 @@ function ToolUsageBars({ tools, copy }: { tools: ToolUsageItem[]; copy: AppCopy[
           className="tool-usage-toggle"
           onClick={() => setExpanded((e) => !e)}
         >
-          {expanded ? `▲ ${tools.length - 5} less` : `▼ ${tools.length - 5} more`}
+          {expanded
+            ? `▲ ${tools.length - 5} less`
+            : `▼ ${tools.length - 5} more`}
         </button>
       ) : null}
     </section>
@@ -2817,13 +3704,21 @@ function ToolUsageBars({ tools, copy }: { tools: ToolUsageItem[]; copy: AppCopy[
 
 // ── ModelSpendTable ──
 
-function ModelSpendTable({ journeys, sessionMap, pricing, copy }: {
+function ModelSpendTable({
+  journeys,
+  sessionMap,
+  pricing,
+  copy,
+}: {
   journeys: TaskJourney[];
   sessionMap: Map<string, SessionRecord>;
   pricing: ModelPricing[];
   copy: AppCopy["timeline"];
 }) {
-  const rows = useMemo(() => aggregateCostByModel(journeys, sessionMap, pricing), [journeys, sessionMap, pricing]);
+  const rows = useMemo(
+    () => aggregateCostByModel(journeys, sessionMap, pricing),
+    [journeys, sessionMap, pricing],
+  );
 
   if (rows.length === 0) {
     return (
@@ -2846,7 +3741,9 @@ function ModelSpendTable({ journeys, sessionMap, pricing, copy }: {
     <section className="model-spend-table" aria-label={copy.modelSpendHeading}>
       <div className="detail-section-heading">
         <span>{copy.modelSpendHeading}</span>
-        <span style={{ color: "var(--muted)", fontSize: 10, fontWeight: 800 }}>{rows.length}</span>
+        <span style={{ color: "var(--muted)", fontSize: 10, fontWeight: 800 }}>
+          {rows.length}
+        </span>
       </div>
       <table>
         <thead>
@@ -2906,22 +3803,39 @@ const CATEGORY_LABELS: Record<string, string> = {
   thinking: "Thinking",
   error: "Error",
   compact: "Compaction",
-  meta: "Meta"
+  meta: "Meta",
 };
 
 function formatTapeTime(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  return d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function formatTapeDate(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
 }
 
-function EventTape({ eventIds, timelineEventsById }: { eventIds: string[]; timelineEventsById: Map<string, TimelineEvent> }) {
+function EventTape({
+  eventIds,
+  timelineEventsById,
+}: {
+  eventIds: string[];
+  timelineEventsById: Map<string, TimelineEvent>;
+}) {
   const events = eventIds
     .map((id) => timelineEventsById.get(id))
     .filter((e): e is TimelineEvent => e !== undefined);
@@ -2932,7 +3846,8 @@ function EventTape({ eventIds, timelineEventsById }: { eventIds: string[]; timel
   const start = timestamps[0];
   const end = timestamps[timestamps.length - 1];
   const span = end - start;
-  const useEvenSpacing = !isFinite(span) || span <= 0 || timestamps.some((t) => isNaN(t));
+  const useEvenSpacing =
+    !isFinite(span) || span <= 0 || timestamps.some((t) => isNaN(t));
   const count = events.length;
 
   return (
@@ -2951,7 +3866,9 @@ function EventTape({ eventIds, timelineEventsById }: { eventIds: string[]; timel
           tooltipParts.push(CATEGORY_LABELS[cat] ?? event.kind);
           if (event.toolName) tooltipParts.push(` · ${event.toolName}`);
           if (event.tokenUsage?.total != null) {
-            tooltipParts.push(`\n${event.tokenUsage.total.toLocaleString()} tokens`);
+            tooltipParts.push(
+              `\n${event.tokenUsage.total.toLocaleString()} tokens`,
+            );
           }
           const timeStr = formatTapeTime(event.timestamp);
           if (timeStr) tooltipParts.push(`\n${timeStr}`);
@@ -2977,59 +3894,758 @@ function EventTape({ eventIds, timelineEventsById }: { eventIds: string[]; timel
   );
 }
 
-// ── ReadoutDashboard ──
+// ── Session Recap Panel ──
 
-interface JourneyStats {
-  sessions: number;
-  estCost: number;
-  totalTokens: number;
-  toolCalls: number;
-  errors: number;
+const CAL_RAMP = [
+  "var(--surface-soft)",
+  "color-mix(in srgb, var(--orange) 25%, var(--surface-soft))",
+  "color-mix(in srgb, var(--orange) 50%, var(--surface-soft))",
+  "color-mix(in srgb, var(--orange) 72%, var(--surface-soft))",
+  "var(--orange)",
+];
+
+function rampIndex(value: number, max: number): number {
+  if (value <= 0 || max <= 0) return 0;
+  const ratio = value / max;
+  return ratio >= 0.66 ? 4 : ratio >= 0.33 ? 3 : ratio >= 0.12 ? 2 : 1;
 }
 
-function computeJourneyStats(journeys: TaskJourney[], timelineEventsById: Map<string, TimelineEvent>, pricing?: ModelPricing[]): JourneyStats {
-  let estCost = 0;
-  let totalTokens = 0;
-  let toolCalls = 0;
-  let errors = 0;
-  for (const j of journeys) {
-    estCost += estimateProjectCost(j.tokenUsage, undefined, pricing);
-    totalTokens += j.tokenUsage?.total ?? 0;
-    for (const eventId of j.eventIds) {
-      const event = timelineEventsById.get(eventId);
-      if (event?.toolName) toolCalls++;
+function SessionRecapPanel({
+  copy,
+  metricsCopy,
+  tokenChartCopy,
+  journeys,
+  timelineEventsById,
+  dailyTokenUsage,
+  dailyTokenUsageLoading,
+  sessionMap,
+  pricing,
+  onPricingChange,
+}: {
+  copy: AppCopy["timeline"];
+  metricsCopy: AppCopy["metrics"];
+  tokenChartCopy: AppCopy["tokenChart"];
+  journeys: TaskJourney[];
+  timelineEventsById: Map<string, TimelineEvent>;
+  dailyTokenUsage: DailyTokenUsageResponse | null;
+  dailyTokenUsageLoading: boolean;
+  sessionMap: Map<string, SessionRecord>;
+  pricing: ModelPricing[];
+  onPricingChange: (pricing: ModelPricing[]) => void;
+}) {
+  const [calMetric, setCalMetric] = useState<"cost" | "tokens" | "sessions">(
+    "cost",
+  );
+
+  const totals = useMemo(() => {
+    let sessions = journeys.length;
+    let totalTokens = 0;
+    let totalInput = 0;
+    let totalOutput = 0;
+    let totalCached = 0;
+    let estCost = 0;
+    let toolCalls = 0;
+    let errors = 0;
+    let totalDurationMs = 0;
+    const toolAgg: Record<string, { count: number; errors: number }> = {};
+
+    for (const j of journeys) {
+      totalTokens += j.tokenUsage?.total ?? 0;
+      totalInput += j.tokenUsage?.input ?? 0;
+      totalOutput += j.tokenUsage?.output ?? 0;
+      totalCached += j.tokenUsage?.cachedInput ?? 0;
+      estCost += estimateProjectCost(j.tokenUsage, undefined, pricing);
+      totalDurationMs += j.durationMs ?? 0;
+      if (j.status === "failed") errors++;
+      for (const eventId of j.eventIds) {
+        const event = timelineEventsById.get(eventId);
+        if (event?.toolName) {
+          toolCalls++;
+          const rec = toolAgg[event.toolName] ?? { count: 0, errors: 0 };
+          rec.count++;
+          if (event.status === "failed") rec.errors++;
+          toolAgg[event.toolName] = rec;
+        }
+      }
     }
-    if (j.status === "failed") errors++;
+
+    return {
+      sessions,
+      totalTokens,
+      totalInput,
+      totalOutput,
+      totalCached,
+      estCost,
+      toolCalls,
+      errors,
+      totalDurationMs,
+      toolAgg,
+    };
+  }, [journeys, timelineEventsById, pricing]);
+
+  const modelBreakdown = useMemo(
+    () => aggregateCostByModel(journeys, sessionMap, pricing),
+    [journeys, sessionMap, pricing],
+  );
+
+  // Calendar: aggregate journeys by date
+  const dailyAgg = useMemo(() => {
+    const map = new Map<
+      number,
+      { date: Date; cost: number; tokens: number; sessions: number }
+    >();
+    for (const j of journeys) {
+      if (!j.startedAt) continue;
+      const d = new Date(j.startedAt);
+      const key = new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate(),
+      ).getTime();
+      const rec = map.get(key) ?? {
+        date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+        cost: 0,
+        tokens: 0,
+        sessions: 0,
+      };
+      rec.cost += estimateProjectCost(j.tokenUsage, undefined, pricing);
+      rec.tokens += j.tokenUsage?.total ?? 0;
+      rec.sessions++;
+      map.set(key, rec);
+    }
+    return map;
+  }, [journeys, pricing]);
+
+  // Calendar weeks
+  const calData = useMemo(() => {
+    const entries = [...dailyAgg.values()];
+    if (entries.length === 0)
+      return {
+        weeks: [],
+        months: [] as { col: number; label: string }[],
+        max: 0,
+      };
+
+    entries.sort((a, b) => a.date.getTime() - b.date.getTime());
+    const minDate = entries[0].date;
+    const maxDate = entries[entries.length - 1].date;
+    // Cap to ~1 year
+    const capMs = 53 * 7 * 86400000;
+    const effectiveMin = new Date(
+      Math.max(minDate.getTime(), maxDate.getTime() - capMs),
+    );
+    const start = new Date(effectiveMin);
+    start.setDate(start.getDate() - start.getDay());
+
+    const metricOf = (r: { cost: number; tokens: number; sessions: number }) =>
+      calMetric === "cost"
+        ? r.cost
+        : calMetric === "tokens"
+          ? r.tokens
+          : r.sessions;
+    let maxVal = 0;
+    for (const r of entries) {
+      if (r.date >= start) {
+        const v = metricOf(r);
+        if (v > maxVal) maxVal = v;
+      }
+    }
+
+    const weeks: {
+      date: Date;
+      rec: (typeof entries)[0] | null;
+      out: boolean;
+    }[][] = [];
+    const months: { col: number; label: string }[] = [];
+    let cur = new Date(start);
+    let lastMonth = -1;
+    while (cur <= maxDate) {
+      const week: {
+        date: Date;
+        rec: (typeof entries)[0] | null;
+        out: boolean;
+      }[] = [];
+      for (let d = 0; d < 7; d++) {
+        const dd = new Date(cur);
+        const key = new Date(
+          dd.getFullYear(),
+          dd.getMonth(),
+          dd.getDate(),
+        ).getTime();
+        const rec = dailyAgg.get(key) ?? null;
+        const out = dd < effectiveMin || dd > maxDate;
+        week.push({ date: dd, rec, out });
+        const m = dd.getMonth();
+        if (d === 0 && m !== lastMonth) {
+          months.push({
+            col: weeks.length,
+            label: dd.toLocaleDateString(undefined, { month: "short" }),
+          });
+          lastMonth = m;
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+      weeks.push(week);
+    }
+
+    return { weeks, months, max: maxVal };
+  }, [dailyAgg, calMetric]);
+
+  // Clock: aggregate timeline events by hour × weekday
+  const clockData = useMemo(() => {
+    const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
+    let maxVal = 0;
+    for (const event of timelineEventsById.values()) {
+      if (!event.timestamp) continue;
+      const d = new Date(event.timestamp);
+      if (isNaN(d.getTime())) continue;
+      grid[d.getDay()][d.getHours()]++;
+      if (grid[d.getDay()][d.getHours()] > maxVal)
+        maxVal = grid[d.getDay()][d.getHours()];
+    }
+    return { grid, max: maxVal };
+  }, [timelineEventsById]);
+
+  // Efficiency metrics
+  const efficiency = useMemo(() => {
+    const totalInput = totals.totalInput + totals.totalCached;
+    const cacheHitRate =
+      totalInput > 0 ? (totals.totalCached / totalInput) * 100 : 0;
+    const toolTotal = totals.toolCalls;
+    const toolErrors = Object.values(totals.toolAgg).reduce(
+      (sum, t) => sum + t.errors,
+      0,
+    );
+    const failRate = toolTotal > 0 ? (toolErrors / toolTotal) * 100 : 0;
+    const successRate = 100 - failRate;
+    const tokensPerSession =
+      totals.sessions > 0 ? totals.totalTokens / totals.sessions : 0;
+    const costPerSession =
+      totals.sessions > 0 ? totals.estCost / totals.sessions : 0;
+
+    // Estimate cache savings
+    let cacheSaved = 0;
+    for (const j of journeys) {
+      const session = sessionMap.get(j.sessionId);
+      const model = session?.modelProvider ?? null;
+      const tier = matchPricing(model, pricing);
+      cacheSaved +=
+        ((j.tokenUsage?.cachedInput ?? 0) * tier.inRate * 0.9) / 1_000_000;
+    }
+
+    return {
+      cacheHitRate,
+      successRate,
+      failRate,
+      toolErrors,
+      tokensPerSession,
+      costPerSession,
+      cacheSaved,
+    };
+  }, [totals, journeys, sessionMap, pricing]);
+
+  // gauge animation refs
+  const gaugeRefs = useRef<(HTMLElement | null)[]>([]);
+
+  const summaryFootnotes = useMemo(() => {
+    const favModel = modelBreakdown[0]?.label ?? "—";
+    let busyDay: { date: Date; cost: number } | null = null;
+    for (const r of dailyAgg.values()) {
+      if (!busyDay || r.cost > busyDay.cost)
+        busyDay = { date: r.date, cost: r.cost };
+    }
+    let priciestCost = 0;
+    let priciestName = "";
+    for (const j of journeys) {
+      const c = estimateProjectCost(j.tokenUsage, undefined, pricing);
+      if (c > priciestCost) {
+        priciestCost = c;
+        const cwd = sessionMap.get(j.sessionId)?.cwd;
+        priciestName = cwd
+          ? cwd
+              .replace(/\\/g, "/")
+              .split("/")
+              .filter(Boolean)
+              .slice(-2)
+              .join("/") || cwd
+          : "(unknown)";
+      }
+    }
+    return { favModel, busyDay, priciestName, priciestCost };
+  }, [modelBreakdown, dailyAgg, journeys, pricing, sessionMap]);
+
+  if (journeys.length === 0) {
+    return (
+      <details className="session-recap">
+        <summary>
+          <span className="caret">▸</span>
+          {copy.recapToggle}
+        </summary>
+        <div className="recap-body">
+          <p className="recap-empty">{copy.recapEmpty}</p>
+        </div>
+      </details>
+    );
   }
-  return {
-    sessions: journeys.length,
-    estCost,
-    totalTokens,
-    toolCalls,
-    errors
-  };
-}
 
-function ReadoutDashboard({ journeys, copy, timelineEventsById, pricing }: { journeys: TaskJourney[]; copy: AppCopy["timeline"]; timelineEventsById: Map<string, TimelineEvent>; pricing?: ModelPricing[] }) {
-  const stats = useMemo(() => computeJourneyStats(journeys, timelineEventsById, pricing), [journeys, timelineEventsById, pricing]);
+  const calMetricLabel = (v: number) =>
+    calMetric === "cost"
+      ? formatCost(v)
+      : calMetric === "tokens"
+        ? formatMillionTokens(v)
+        : `${v} sess`;
 
-  const cells = [
-    { key: "sessions", label: copy.readoutSessions, value: String(stats.sessions) },
-    { key: "estCost", label: copy.readoutEstCost, value: formatCost(stats.estCost) },
-    { key: "totalTokens", label: copy.readoutTotalTokens, value: formatMillionTokens(stats.totalTokens) },
-    { key: "toolCalls", label: copy.readoutToolCalls, value: String(stats.toolCalls) },
-    { key: "errors", label: copy.readoutErrors, value: String(stats.errors), danger: stats.errors > 0 }
-  ];
+  const toolList = Object.entries(totals.toolAgg).sort(
+    (a, b) => b[1].count - a[1].count,
+  );
+  const toolMax = toolList.length > 0 ? toolList[0][1].count : 1;
 
   return (
-    <div className="readout-dashboard" aria-label="Project statistics">
-      {cells.map((cell) => (
-        <div key={cell.key} className={`readout-cell${cell.danger ? " danger" : ""}`}>
-          <span className="readout-cell-label">{cell.label}</span>
-          <strong className="readout-cell-value">{cell.value}</strong>
+    <details className="session-recap">
+      <summary>
+        <span className="caret">▸</span>
+        {copy.recapToggle}
+        <span className="recap-summary-stats">
+          <span>
+            {totals.sessions} <b>{copy.readoutSessions.toLowerCase()}</b>
+          </span>
+          <span>
+            <b>{formatCost(totals.estCost)}</b>
+          </span>
+          <span>
+            <b>{formatMillionTokens(totals.totalTokens)}</b> tokens
+          </span>
+          <span className="recap-summary-footnotes">
+            <span>
+              most-used <b>{summaryFootnotes.favModel}</b>
+            </span>
+            {summaryFootnotes.busyDay ? (
+              <span>
+                busiest{" "}
+                <b>
+                  {summaryFootnotes.busyDay.date.toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </b>{" "}
+                <em>{formatCost(summaryFootnotes.busyDay.cost)}</em>
+              </span>
+            ) : null}
+            <span>
+              priciest <b>{summaryFootnotes.priciestName}</b>{" "}
+              <em>{formatCost(summaryFootnotes.priciestCost)}</em>
+            </span>
+          </span>
+        </span>
+      </summary>
+      <div className="recap-body">
+        {/* 01 Readout */}
+        <div className="recap-eyebrow">
+          <span className="tag">01</span> readout
         </div>
-      ))}
-    </div>
+        <div className="recap-readout">
+          <div className="r-cell">
+            <div className="rk">{copy.readoutSessions}</div>
+            <div className="rv">{totals.sessions}</div>
+          </div>
+          <div className="r-cell">
+            <div className="rk">{copy.readoutEstCost}</div>
+            <div className="rv cost">{formatCost(totals.estCost)}</div>
+          </div>
+          <div className="r-cell">
+            <div className="rk">{copy.readoutTotalTokens}</div>
+            <div className="rv">{formatMillionTokens(totals.totalTokens)}</div>
+            <div className="rn">
+              {formatMillionTokens(totals.totalInput)} in ·{" "}
+              {formatMillionTokens(totals.totalOutput)} out
+            </div>
+          </div>
+          <div className="r-cell">
+            <div className="rk">{copy.readoutToolCalls}</div>
+            <div className="rv">{totals.toolCalls.toLocaleString()}</div>
+            <div className="rn">{efficiency.toolErrors} failed</div>
+          </div>
+          <div className="r-cell">
+            <div className="rk">{copy.readoutErrors}</div>
+            <div className={`rv${totals.errors > 0 ? " err" : ""}`}>
+              {totals.errors}
+            </div>
+            <div className="rn">
+              {totals.sessions - totals.errors} succeeded
+            </div>
+          </div>
+        </div>
+
+        {/* 02 Rhythm */}
+        <div className="recap-eyebrow">
+          <span className="tag">02</span> {copy.recapRhythmHeading}
+        </div>
+        <div className="recap-rhythm-grid">
+          <div className="recap-rhythm-panel">
+            <div className="recap-rhythm-head">
+              <span className="recap-rhythm-title">
+                {copy.recapDailyActivity}
+              </span>
+              <div className="recap-metric-toggle">
+                <button
+                  className={calMetric === "cost" ? "on" : ""}
+                  onClick={() => setCalMetric("cost")}
+                >
+                  cost
+                </button>
+                <button
+                  className={calMetric === "tokens" ? "on" : ""}
+                  onClick={() => setCalMetric("tokens")}
+                >
+                  tokens
+                </button>
+                <button
+                  className={calMetric === "sessions" ? "on" : ""}
+                  onClick={() => setCalMetric("sessions")}
+                >
+                  sessions
+                </button>
+              </div>
+            </div>
+            {calData.weeks.length === 0 ? (
+              <p className="recap-empty">no dated sessions</p>
+            ) : (
+              <>
+                <div className="recap-cal-scroll">
+                  <div className="recap-cal-months">
+                    {calData.months.map((m, i) => (
+                      <span
+                        key={i}
+                        style={
+                          i > 0
+                            ? {
+                                marginLeft:
+                                  (m.col -
+                                    (calData.months[i - 1]?.col ?? m.col) -
+                                    1) *
+                                  16,
+                              }
+                            : undefined
+                        }
+                      >
+                        {m.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="recap-cal-body">
+                    <div className="recap-cal-wdays">
+                      {["", "M", "", "W", "", "F", ""].map((t, i) => (
+                        <span key={i}>{t}</span>
+                      ))}
+                    </div>
+                    <div className="recap-cal">
+                      {calData.weeks.map((week, wi) => (
+                        <div key={wi} className="recap-cal-week">
+                          {week.map((day, di) => {
+                            const v = day.rec
+                              ? calMetric === "cost"
+                                ? day.rec.cost
+                                : calMetric === "tokens"
+                                  ? day.rec.tokens
+                                  : day.rec.sessions
+                              : 0;
+                            return (
+                              <div
+                                key={di}
+                                className="recap-cal-day"
+                                style={
+                                  day.rec && !day.out
+                                    ? {
+                                        background:
+                                          CAL_RAMP[rampIndex(v, calData.max)],
+                                        borderColor: "transparent",
+                                      }
+                                    : undefined
+                                }
+                                title={
+                                  day.rec
+                                    ? `${day.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · ${calMetricLabel(v)} · ${day.rec.sessions} session${day.rec.sessions !== 1 ? "s" : ""}`
+                                    : undefined
+                                }
+                              />
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="recap-cal-legend">
+                  less{" "}
+                  {CAL_RAMP.map((c, i) => (
+                    <i key={i} style={{ background: c }} />
+                  ))}{" "}
+                  more
+                </div>
+              </>
+            )}
+          </div>
+          <div className="recap-rhythm-panel">
+            <div className="recap-rhythm-head">
+              <span className="recap-rhythm-title">
+                {copy.recapWhenYouShip}
+              </span>
+              <span className="recap-rhythm-sub">events · hour × weekday</span>
+            </div>
+            {clockData.max === 0 ? (
+              <p className="recap-empty">no timestamped events</p>
+            ) : (
+              <>
+                <div className="recap-clock">
+                  {[1, 2, 3, 4, 5, 6, 0].map((di) => {
+                    const names = [
+                      "Mon",
+                      "Tue",
+                      "Wed",
+                      "Thu",
+                      "Fri",
+                      "Sat",
+                      "Sun",
+                    ];
+                    const dayIdx = [1, 2, 3, 4, 5, 6, 0].indexOf(di);
+                    return (
+                      <Fragment key={di}>
+                        <div className="cl-lbl">{names[dayIdx]}</div>
+                        {Array.from({ length: 24 }, (_, h) => {
+                          const v = clockData.grid[di][h];
+                          return (
+                            <div
+                              key={`${di}-${h}`}
+                              className="cl-cell"
+                              style={
+                                v > 0
+                                  ? {
+                                      background:
+                                        CAL_RAMP[rampIndex(v, clockData.max)],
+                                    }
+                                  : undefined
+                              }
+                              title={
+                                v > 0
+                                  ? `${names[dayIdx]} ${String(h).padStart(2, "0")}:00 · ${v} event${v !== 1 ? "s" : ""}`
+                                  : undefined
+                              }
+                            />
+                          );
+                        })}
+                      </Fragment>
+                    );
+                  })}
+                </div>
+                <div className="recap-clock-axis">
+                  <span className="pad" />
+                  <b>0</b>
+                  <b>6</b>
+                  <b>12</b>
+                  <b>18</b>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+        {dailyTokenUsage && dailyTokenUsage.points.length > 0 ? (
+          <div className="recap-rhythm-panel" style={{ marginTop: 12 }}>
+            <div className="recap-rhythm-head">
+              <span className="recap-rhythm-title">
+                {metricsCopy.dailyUsageByDay}
+              </span>
+            </div>
+            <DailyTokenUsagePanel
+              copy={tokenChartCopy}
+              data={dailyTokenUsage}
+              loading={dailyTokenUsageLoading}
+              title={metricsCopy.tokens}
+              subtitle={metricsCopy.dailyUsageByDay}
+              maxVisiblePoints={30}
+              className=""
+              showHeaderToggle={false}
+              expanded={true}
+              onExpandedChange={() => {}}
+            />
+          </div>
+        ) : null}
+
+        {/* 03 Efficiency */}
+        <div className="recap-eyebrow">
+          <span className="tag">03</span> {copy.recapEfficiencyHeading}
+        </div>
+        <div className="recap-eff-grid">
+          <div className="recap-eff-card">
+            <div className="et">{copy.recapCacheHit}</div>
+            <div
+              className={`ev${efficiency.cacheHitRate >= 50 ? " good" : efficiency.cacheHitRate < 15 ? " warn" : ""}`}
+            >
+              {efficiency.cacheHitRate.toFixed(0)}%
+            </div>
+            <div className="es">
+              saved ~{formatCost(efficiency.cacheSaved)} vs uncached input
+            </div>
+            <div className="recap-gauge">
+              <i
+                ref={(el) => {
+                  gaugeRefs.current[0] = el;
+                }}
+                style={{
+                  width: `${Math.max(2, Math.min(100, efficiency.cacheHitRate))}%`,
+                }}
+                className=""
+              />
+            </div>
+          </div>
+          <div className="recap-eff-card">
+            <div className="et">{copy.recapErrorRate}</div>
+            <div
+              className={`ev${efficiency.failRate > 10 ? " warn" : " good"}`}
+            >
+              {efficiency.successRate.toFixed(0)}%
+            </div>
+            <div className="es">
+              {efficiency.toolErrors} failed of{" "}
+              {totals.toolCalls.toLocaleString()} calls
+            </div>
+            <div className="recap-gauge">
+              <i
+                ref={(el) => {
+                  gaugeRefs.current[1] = el;
+                }}
+                style={{
+                  width: `${Math.max(2, Math.min(100, efficiency.successRate))}%`,
+                }}
+                className={efficiency.failRate > 10 ? "warn" : ""}
+              />
+            </div>
+          </div>
+          <div className="recap-eff-card">
+            <div className="et">{copy.recapTokensPerSession}</div>
+            <div className="ev">
+              {formatMillionTokens(efficiency.tokensPerSession)}
+            </div>
+            <div className="es">
+              avg across {totals.sessions} session
+              {totals.sessions !== 1 ? "s" : ""}
+            </div>
+            <div className="recap-gauge">
+              <i
+                ref={(el) => {
+                  gaugeRefs.current[2] = el;
+                }}
+                style={{
+                  width: `${Math.max(2, Math.min(100, (efficiency.tokensPerSession / 1_000_000) * 100))}%`,
+                }}
+                className="clay"
+              />
+            </div>
+          </div>
+          <div className="recap-eff-card">
+            <div className="et">{copy.recapCostPerSession}</div>
+            <div className="ev cost">
+              {formatCost(efficiency.costPerSession)}
+            </div>
+            <div className="es">
+              avg {formatCost(efficiency.costPerSession)} / session
+            </div>
+            <div className="recap-gauge">
+              <i
+                ref={(el) => {
+                  gaugeRefs.current[3] = el;
+                }}
+                style={{
+                  width: `${Math.max(2, Math.min(100, efficiency.costPerSession * 100))}%`,
+                }}
+                className="clay"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 04 Spend by Model */}
+        <div className="recap-eyebrow">
+          <span className="tag">04</span> {copy.modelSpendHeading}
+        </div>
+        {modelBreakdown.length === 0 ? (
+          <p className="recap-empty">{copy.modelSpendEmpty}</p>
+        ) : (
+          <div className="recap-model-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>{copy.modelSpendModel}</th>
+                  <th>{copy.modelSpendMsgs}</th>
+                  <th>{copy.modelSpendInput}</th>
+                  <th>{copy.modelSpendOutput}</th>
+                  <th>{copy.modelSpendCached}</th>
+                  <th>{copy.modelSpendCost}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modelBreakdown.map((m) => (
+                  <tr key={m.model}>
+                    <td>{m.label}</td>
+                    <td>{m.messages}</td>
+                    <td>{formatMillionTokens(m.input)}</td>
+                    <td>{formatMillionTokens(m.output)}</td>
+                    <td>{formatMillionTokens(m.cachedInput)}</td>
+                    <td className="cost">{formatCost(m.cost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>{copy.modelSpendTotal}</td>
+                  <td>{modelBreakdown.reduce((s, m) => s + m.messages, 0)}</td>
+                  <td>{formatMillionTokens(totals.totalInput)}</td>
+                  <td>{formatMillionTokens(totals.totalOutput)}</td>
+                  <td>{formatMillionTokens(totals.totalCached)}</td>
+                  <td className="cost">{formatCost(totals.estCost)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+
+        {/* 05 Tool Usage */}
+        <div className="recap-eyebrow">
+          <span className="tag">05</span> {copy.toolUsageHeading}
+        </div>
+        {toolList.length === 0 ? (
+          <p className="recap-empty">{copy.toolUsageEmpty}</p>
+        ) : (
+          <div className="recap-tools">
+            {toolList.map(([name, rec]) => (
+              <div key={name} className="recap-tool-row">
+                <span className="name">{name}</span>
+                <span className="track">
+                  <span
+                    className="fill"
+                    style={{ width: `${(rec.count / toolMax) * 100}%` }}
+                  />
+                </span>
+                <span className="figs">
+                  {rec.count}
+                  {rec.errors > 0 ? (
+                    <>
+                      {" "}
+                      · <span className="e">{rec.errors} err</span>
+                    </>
+                  ) : null}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <PricingEditor
+          pricing={pricing}
+          onPricingChange={onPricingChange}
+          copy={copy}
+        />
+      </div>
+    </details>
   );
 }
 
@@ -3037,7 +4653,12 @@ function ReadoutDashboard({ journeys, copy, timelineEventsById, pricing }: { jou
 
 type SortKey = "newest" | "cost" | "duration" | "tools" | "errors";
 
-function applySearchAndSort(journeys: TaskJourney[], searchQuery: string, sortKey: SortKey, pricing?: ModelPricing[]): TaskJourney[] {
+function applySearchAndSort(
+  journeys: TaskJourney[],
+  searchQuery: string,
+  sortKey: SortKey,
+  pricing?: ModelPricing[],
+): TaskJourney[] {
   const query = searchQuery.trim().toLowerCase();
   const filtered = query
     ? journeys.filter((j) => j.title.toLowerCase().includes(query))
@@ -3046,13 +4667,18 @@ function applySearchAndSort(journeys: TaskJourney[], searchQuery: string, sortKe
   return [...filtered].sort((a, b) => {
     switch (sortKey) {
       case "cost":
-        return estimateProjectCost(b.tokenUsage, undefined, pricing) - estimateProjectCost(a.tokenUsage, undefined, pricing);
+        return (
+          estimateProjectCost(b.tokenUsage, undefined, pricing) -
+          estimateProjectCost(a.tokenUsage, undefined, pricing)
+        );
       case "duration":
         return b.durationMs - a.durationMs;
       case "tools":
         return b.skills.length - a.skills.length;
       case "errors":
-        return (b.status === "failed" ? 1 : 0) - (a.status === "failed" ? 1 : 0);
+        return (
+          (b.status === "failed" ? 1 : 0) - (a.status === "failed" ? 1 : 0)
+        );
       case "newest":
       default:
         return Date.parse(b.startedAt) - Date.parse(a.startedAt);
@@ -3062,17 +4688,25 @@ function applySearchAndSort(journeys: TaskJourney[], searchQuery: string, sortKe
 
 // ── Pricing Editor ──
 
-function PricingEditor({ pricing, onPricingChange, copy }: {
+function PricingEditor({
+  pricing,
+  onPricingChange,
+  copy,
+}: {
   pricing: ModelPricing[];
   onPricingChange: (pricing: ModelPricing[]) => void;
   copy: AppCopy["timeline"];
 }) {
   const providerOrder = ["Anthropic", "OpenAI", "Other"] as const;
 
-  function handleRateChange(id: string, field: "inRate" | "outRate", value: string) {
+  function handleRateChange(
+    id: string,
+    field: "inRate" | "outRate",
+    value: string,
+  ) {
     const num = parseFloat(value);
     if (isNaN(num) || num < 0) return;
-    const next = pricing.map(p => p.id === id ? { ...p, [field]: num } : p);
+    const next = pricing.map((p) => (p.id === id ? { ...p, [field]: num } : p));
     onPricingChange(next);
   }
 
@@ -3112,7 +4746,9 @@ function PricingEditor({ pricing, onPricingChange, copy }: {
                     step="0.1"
                     min="0"
                     value={item.inRate}
-                    onChange={(e) => handleRateChange(item.id, "inRate", e.target.value)}
+                    onChange={(e) =>
+                      handleRateChange(item.id, "inRate", e.target.value)
+                    }
                     aria-label={`${item.label} input rate`}
                   />
                   <input
@@ -3120,7 +4756,9 @@ function PricingEditor({ pricing, onPricingChange, copy }: {
                     step="0.1"
                     min="0"
                     value={item.outRate}
-                    onChange={(e) => handleRateChange(item.id, "outRate", e.target.value)}
+                    onChange={(e) =>
+                      handleRateChange(item.id, "outRate", e.target.value)
+                    }
                     aria-label={`${item.label} output rate`}
                   />
                 </div>
@@ -3133,4 +4771,10 @@ function PricingEditor({ pricing, onPricingChange, copy }: {
   );
 }
 
-const ZERO_TOKEN_USAGE: TokenUsage = { input: 0, output: 0, reasoning: 0, cachedInput: 0, total: 0 };
+const ZERO_TOKEN_USAGE: TokenUsage = {
+  input: 0,
+  output: 0,
+  reasoning: 0,
+  cachedInput: 0,
+  total: 0,
+};
