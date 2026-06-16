@@ -24,6 +24,10 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { id: "oGpt5",   provider: "OpenAI", label: "GPT-5",      test: /(gpt-?5|o3|o4)/i,     inRate: 2.5,  outRate: 15  },
   { id: "o55",     provider: "OpenAI", label: "GPT-5.5",    test: /gpt-?5\.?5/i,         inRate: 5,    outRate: 30  },
 
+  // Provider-level defaults (when session only records provider, not model)
+  { id: "anthropic",  provider: "Anthropic", label: "Claude (unspecified)", test: /anthropic/i, inRate: 3,   outRate: 15 },
+  { id: "openai",     provider: "OpenAI",    label: "GPT (unspecified)",    test: /openai/i,    inRate: 2.5, outRate: 15 },
+
   // Fallback
   { id: "unknown", provider: "Other", label: "Unknown", test: /.*/, inRate: 3, outRate: 15 },
 ];
