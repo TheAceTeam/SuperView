@@ -1,18 +1,43 @@
 {
-  "name": "superview",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@seanxdo/superview",
+  "version": "0.1.11",
+  "description": "Coding-agent flight recorder — timeline dashboard with replayable agent-run drill-downs.",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheAceTeam/SuperView.git"
+  },
+  "keywords": [
+    "codex",
+    "claude-code",
+    "ai-agent",
+    "observability",
+    "llm-tracing",
+    "agent-dashboard",
+    "developer-tools"
+  ],
+  "bin": {
+    "superview": "runtime-node/cli-start.js"
+  },
+  "files": [
+    "runtime-node/",
+    "core/",
+    "storage/",
+    "dist/ui/"
+  ],
   "scripts": {
     "dev": "concurrently -k -n server,client -c orange,blue \"pnpm dev:server\" \"pnpm dev:client\"",
     "dev:client": "vite --host 127.0.0.1 --port 5173",
-    "dev:server": "tsx watch runtime-node/server.ts",
+    "dev:server": "tsx watch runtime-node/dev-server.ts",
+    "start": "node runtime-node/cli-start.js",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "ingest": "tsx runtime-node/cli-ingest.ts"
+    "ingest": "tsx runtime-node/cli-ingest.ts",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.1",

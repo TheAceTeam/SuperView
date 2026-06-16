@@ -318,15 +318,23 @@ function isCommitInWindow(commit: GitCommitRecord, from?: string | null, to?: st
   return true;
 }
 
+function resolveTsxCli() {
+  // Try package-local node_modules first (works when installed globally)
+  const pkgTsx = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "node_modules", "tsx", "dist", "cli.mjs");
+  if (existsSync(pkgTsx)) return pkgTsx;
+  // Fall back to CWD (dev mode)
+  const cwdTsx = path.resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+  if (existsSync(cwdTsx)) return cwdTsx;
+  // Last resort: .bin/tsx
+  return path.resolve(process.cwd(), "node_modules", ".bin", "tsx");
+}
+
 function buildWorkerCommand(jobId: string, options: IngestStartOptions) {
   const workerPath = workerPathFromImportMeta();
-  const tsxCli = path.resolve(process.cwd(), "node_modules", "tsx", "dist", "cli.mjs");
+  const tsxCli = resolveTsxCli();
   const encodedOptions = Buffer.from(JSON.stringify(options), "utf8").toString("base64url");
   const args = [workerPath, jobId, encodedOptions];
-  if (existsSync(tsxCli)) {
-    return { command: process.execPath, args: [tsxCli, ...args] };
-  }
-  return { command: path.resolve(process.cwd(), "node_modules", ".bin", "tsx"), args };
+  return { command: process.execPath, args: [tsxCli, ...args] };
 }
 
 function workerPathFromImportMeta() {
