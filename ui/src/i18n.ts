@@ -42,6 +42,16 @@ export type IngestCopy = {
   aria: (status: string, phase: string, processed: number, total: number, percent: number) => string;
 };
 
+export type TourCopy = {
+  restart: string;
+  skip: string;
+  next: string;
+  prev: string;
+  done: string;
+  stepLabel: (current: number, total: number) => string;
+  steps: Array<{ title: string; detail: string }>;
+};
+
 export type AppCopy = {
   brandSubtitle: string;
   language: { short: string; aria: string; title: string };
@@ -244,6 +254,7 @@ export type AppCopy = {
   };
   ingest: IngestCopy;
   tokenChart: TokenChartCopy;
+  tour: TourCopy;
 };
 
 export function normalizeLanguage(value: string | null): Language {
@@ -530,6 +541,52 @@ export const COPY: Record<Language, AppCopy> = {
       legendAria: "Token usage legend",
       emptyLoading: "Loading daily token usage...",
       empty: "No daily token usage yet."
+    },
+    tour: {
+      restart: "Restart tour",
+      skip: "Skip tour",
+      next: "Next",
+      prev: "Back",
+      done: "Done",
+      stepLabel: (current: number, total: number) => `Step ${current} of ${total}`,
+      steps: [
+        {
+          title: "Scan Agent Logs",
+          detail: "Point SuperView at your Codex, Claude Code, or OpenCode log directory to start indexing agent runs."
+        },
+        {
+          title: "Switch Projects",
+          detail: "Browse all indexed projects. Filter by provider and select a project to inspect its timeline."
+        },
+        {
+          title: "Session Recap",
+          detail: "A collapsible black-box readout: sessions, tokens, costs, tool usage, daily rhythm, and efficiency gauges — all in one panel."
+        },
+        {
+          title: "Daily Token Usage",
+          detail: "Vertical bar chart of token consumption per day, segmented by input, output, cached, and reasoning tokens."
+        },
+        {
+          title: "User Input",
+          detail: "Every user message becomes a task journey. Click any journey to expand its tool calls, evidence, and context replay."
+        },
+        {
+          title: "Context Replay",
+          detail: "Step through the agent's context window snapshot-by-snapshot. Watch how context blocks are added, changed, and dropped over time."
+        },
+        {
+          title: "Context Replay Summary",
+          detail: "A quick readout of the current context replay session: total snapshots, block counts, hazards, and event counts."
+        },
+        {
+          title: "Context Timeline",
+          detail: "A full-width factory belt view of every snapshot and its active context blocks. See the entire context flow at a glance."
+        },
+        {
+          title: "Theme & Language",
+          detail: "Switch between 4 themes (light, dark, forest, plasma) or toggle Simplified Chinese and English."
+        }
+      ]
     }
   },
   "zh-CN": {
@@ -811,6 +868,52 @@ export const COPY: Record<Language, AppCopy> = {
       legendAria: "Token 用量图例",
       emptyLoading: "正在加载按天 token 用量...",
       empty: "还没有按天 token 用量。"
+    },
+    tour: {
+      restart: "重新引导",
+      skip: "跳过引导",
+      next: "下一步",
+      prev: "上一步",
+      done: "完成",
+      stepLabel: (current: number, total: number) => `第 ${current} / ${total} 步`,
+      steps: [
+        {
+          title: "扫描 Agent 日志",
+          detail: "将 SuperView 指向您的 Codex、Claude Code 或 OpenCode 日志目录，开始索引 Agent 运行记录。"
+        },
+        {
+          title: "切换项目",
+          detail: "浏览所有已索引的项目。按来源过滤，选择一个项目查看其时间线。"
+        },
+        {
+          title: "会话概览",
+          detail: "可折叠的黑匣子面板：会话数、Token 用量、费用、工具用量、每日节奏和效率指标，一览无余。"
+        },
+        {
+          title: "每日 Token 用量",
+          detail: "按天统计的 Token 消耗柱状图，按输入、输出、缓存和推理 Token 分段显示。"
+        },
+        {
+          title: "用户输入",
+          detail: "每条用户消息都是一个任务旅程。点击任意旅程展开工具调用、证据和上下文回放。"
+        },
+        {
+          title: "上下文回放",
+          detail: "逐步浏览 Agent 上下文窗口的每个快照。观察上下文块的添加、变更和丢弃过程。"
+        },
+        {
+          title: "上下文回放摘要",
+          detail: "当前回放会话的快速概览：快照总数、上下文块数量、警告和事件计数。"
+        },
+        {
+          title: "上下文时间线",
+          detail: "全宽工厂流水线视图，展示所有快照及其活跃上下文块。一目了然地查看整个上下文流转。"
+        },
+        {
+          title: "主题与语言",
+          detail: "在 4 种主题（明亮、暗色、森林、等离子紫）间切换，或切换简体中文和英文。"
+        }
+      ]
     }
   }
 };

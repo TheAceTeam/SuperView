@@ -54,7 +54,7 @@ import {
   startIngest,
 } from "./api";
 import { DailyTokenUsagePanel } from "./DailyTokenUsagePanel";
-import { AppCopy, COPY, IngestCopy, Language, normalizeLanguage } from "./i18n";
+import { AppCopy, COPY, IngestCopy, Language, TourCopy, normalizeLanguage } from "./i18n";
 import { formatMillionTokens } from "./tokenFormat";
 import {
   aggregateCostByModel,
@@ -144,6 +144,11 @@ export function App() {
   const [pricing, setPricing] = useState<ModelPricing[]>(() =>
     DEFAULT_PRICING.map((p) => ({ ...p, test: p.test })),
   );
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [tourCompleted, setTourCompleted] = useState<boolean>(() =>
+    localStorage.getItem("superview-tour-completed") === "true",
+  );
 
   const copy = COPY[language];
 
@@ -193,6 +198,18 @@ export function App() {
     localStorage.setItem("superview-language", language);
   }, [language]);
 
+  // Auto-open tour for first-time visitors after data loads
+  useEffect(() => {
+    if (!tourCompleted && !loading) {
+      const timer = setTimeout(() => setTourOpen(true), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [tourCompleted, loading]);
+
+  useEffect(() => {
+    localStorage.setItem("superview-tour-completed", String(tourCompleted));
+  }, [tourCompleted]);
+
   useEffect(() => {
     void loadProjects();
   }, []);
@@ -236,8 +253,14 @@ export function App() {
         try {
           const fresh = await fetchProjects();
           setProjects(fresh);
-          if (selectedProjectId)
-            setDailyTokenUsage(await fetchDailyTokenUsage(selectedProjectId));
+          if (selectedProjectId) {
+            const [freshTimeline, freshTokens] = await Promise.all([
+              fetchTimeline(selectedProjectId, { limit: PROJECT_TIMELINE_LIMIT, offset: 0 }),
+              fetchDailyTokenUsage(selectedProjectId),
+            ]);
+            setTimeline(freshTimeline);
+            setDailyTokenUsage(freshTokens);
+          }
         } catch {
           // silent
         }
@@ -796,6 +819,18 @@ export function App() {
             ) : null}
           </div>
           <button
+            className="icon-button tour-restart-button"
+            aria-label={copy.tour.restart}
+            title={copy.tour.restart}
+            onClick={() => {
+              setTourStep(0);
+              setTourCompleted(false);
+              setTourOpen(true);
+            }}
+          >
+            <RotateCw size={16} />
+          </button>
+          <button
             className="shell-button language-toggle-button"
             aria-label={copy.language.aria}
             title={copy.language.title}
@@ -936,6 +971,25 @@ export function App() {
         <div className="dropzone-overlay" aria-hidden="true">
           <div className="dropzone-message">{copy.timeline.dropzoneActive}</div>
         </div>
+      ) : null}
+      {tourOpen ? (
+        <OnboardingTour
+          step={tourStep}
+          totalSteps={copy.tour.steps.length}
+          copy={copy.tour}
+          onPrev={() => setTourStep((s) => Math.max(0, s - 1))}
+          onNext={() =>
+            setTourStep((s) => Math.min(copy.tour.steps.length - 1, s + 1))
+          }
+          onDone={() => {
+            setTourOpen(false);
+            setTourCompleted(true);
+          }}
+          onSkip={() => {
+            setTourOpen(false);
+            setTourCompleted(true);
+          }}
+        />
       ) : null}
     </div>
   );
@@ -3264,6 +3318,277 @@ function Tooltip({ text, children }: { text: string; children: ReactNode }) {
   );
 }
 
+function OnboardingTour({
+  step,
+  totalSteps,
+  copy,
+  onPrev,
+  onNext,
+  onDone,
+  onSkip,
+}: {
+  step: number;
+  totalSteps: number;
+  copy: TourCopy;
+  onPrev: () => void;
+  onNext: () => void;
+  onDone: () => void;
+  onSkip: () => void;
+}) {
+  const targetSelectors = [
+    ".scan-dropdown-trigger",
+    ".project-dropdown-trigger",
+    ".session-recap",
+    ".token-chart-panel",
+    ".conversation-master-item",
+    ".context-replay-panel",
+    ".context-replay-summary",
+    ".context-factory-strip",
+    ".theme-dropdown",
+  ];
+  const targetPaddings = [10, 10, 12, 12, 10, 12, 8, 8, 12];
+  const targetPlacements: Array<"bottom" | "top" | "right" | "left"> = [
+    "bottom",
+    "bottom",
+    "top",
+    "top",
+    "left",
+    "top",
+    "bottom",
+    "bottom",
+    "bottom",
+  ];
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+
+  const currentSelector = targetSelectors[step] ?? null;
+  const currentPadding = targetPaddings[step] ?? 10;
+  const currentPlacement = targetPlacements[step] ?? "bottom";
+
+  useLayoutEffect(() => {
+    if (window.innerWidth < 760) return;
+    function recalc() {
+      const el = currentSelector
+        ? document.querySelector(currentSelector)
+        : null;
+      if (!el) {
+        setTargetRect(null);
+        return;
+      }
+      const raw = el.getBoundingClientRect();
+      setTargetRect(
+        new DOMRect(
+          raw.left - currentPadding,
+          raw.top - currentPadding,
+          raw.width + currentPadding * 2,
+          raw.height + currentPadding * 2,
+        ),
+      );
+    }
+    recalc();
+    window.addEventListener("resize", recalc);
+    window.addEventListener("scroll", recalc, { passive: true });
+    return () => {
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("scroll", recalc);
+    };
+  }, [step, currentSelector, currentPadding]);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setSkipped(true);
+      }
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, []);
+
+  useEffect(() => {
+    if (skipped) {
+      setTransitioning(true);
+      const timer = setTimeout(() => {
+        onSkip();
+      }, 160);
+      return () => clearTimeout(timer);
+    }
+  }, [skipped, onSkip]);
+
+  function handleNext() {
+    if (transitioning) return;
+    setTransitioning(true);
+    setTimeout(() => {
+      if (step < totalSteps - 1) {
+        onNext();
+      } else {
+        onDone();
+      }
+      setTransitioning(false);
+    }, 100);
+  }
+
+  function handlePrev() {
+    if (transitioning) return;
+    setTransitioning(true);
+    setTimeout(() => {
+      onPrev();
+      setTransitioning(false);
+    }, 100);
+  }
+
+  function handleDone() {
+    setTransitioning(true);
+    setTimeout(() => {
+      onDone();
+    }, 160);
+  }
+
+  if (window.innerWidth < 760) return null;
+
+  const cardWidth = Math.min(400, window.innerWidth - 32);
+  const cardHeight = 200; // approximate, used for positioning
+  const gap = 12;
+
+  function computeCardPosition() {
+    if (!targetRect) {
+      return {
+        top: Math.max(16, (window.innerHeight - cardHeight) / 2),
+        left: Math.max(16, (window.innerWidth - cardWidth) / 2),
+      };
+    }
+    const placements = [currentPlacement, "bottom", "top", "right", "left"];
+    const unique = [...new Set(placements)];
+    for (const placement of unique) {
+      let top = 0, left = 0;
+      switch (placement) {
+        case "bottom":
+          top = targetRect.bottom + gap;
+          left = targetRect.left;
+          break;
+        case "top":
+          top = targetRect.top - gap - cardHeight;
+          left = targetRect.left;
+          break;
+        case "right":
+          top = targetRect.top;
+          left = targetRect.right + gap;
+          break;
+        case "left":
+          top = targetRect.top;
+          left = targetRect.left - gap - cardWidth;
+          break;
+        default:
+          break;
+      }
+      top = Math.max(16, Math.min(top, window.innerHeight - cardHeight - 16));
+      left = Math.max(16, Math.min(left, window.innerWidth - cardWidth - 16));
+      const cardRect = {
+        top,
+        left,
+        right: left + cardWidth,
+        bottom: top + cardHeight,
+      };
+      const overlap = !(
+        cardRect.right < targetRect.left ||
+        cardRect.left > targetRect.right ||
+        cardRect.bottom < targetRect.top ||
+        cardRect.top > targetRect.bottom
+      );
+      if (!overlap) return { top, left };
+    }
+    return {
+      top: Math.max(16, (window.innerHeight - cardHeight) / 2),
+      left: Math.max(16, (window.innerWidth - cardWidth) / 2),
+    };
+  }
+
+  const cardPos = computeCardPosition();
+  const stepData = copy.steps[step] ?? { title: "", detail: "" };
+
+  return createPortal(
+    <div className="tour-root">
+      <div className="tour-backplate" />
+      {targetRect && (
+        <>
+          <div
+            className="tour-spotlight"
+            style={{
+              left: targetRect.left,
+              top: targetRect.top,
+              width: targetRect.width,
+              height: targetRect.height,
+              borderRadius: 8,
+            }}
+          />
+          <div
+            className="tour-spotlight-border"
+            style={{
+              left: targetRect.left,
+              top: targetRect.top,
+              width: targetRect.width,
+              height: targetRect.height,
+              borderRadius: 8,
+            }}
+          />
+        </>
+      )}
+      <div
+        className="tour-card"
+        style={{
+          top: cardPos.top,
+          left: cardPos.left,
+          opacity: transitioning ? 0 : 1,
+        }}
+      >
+        <div className="tour-card-step-label">
+          {copy.stepLabel(step + 1, totalSteps)}
+        </div>
+        <h3 className="tour-card-title">{stepData.title}</h3>
+        <p className="tour-card-detail">{stepData.detail}</p>
+        <div className="tour-card-progress">
+          {Array.from({ length: totalSteps }, (_, i) => (
+            <span
+              key={i}
+              className={`tour-step-dot${i === step ? " active" : ""}`}
+            />
+          ))}
+        </div>
+        <div className="tour-card-actions">
+          <button type="button" className="tour-skip-btn" onClick={onSkip}>
+            {copy.skip}
+          </button>
+          <div className="tour-nav-group">
+            {step > 0 && (
+              <button type="button" className="tour-nav-btn" onClick={handlePrev}>
+                {copy.prev}
+              </button>
+            )}
+            {step < totalSteps - 1 ? (
+              <button
+                type="button"
+                className="tour-nav-btn tour-next-btn"
+                onClick={handleNext}
+              >
+                {copy.next}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="tour-nav-btn tour-done-btn"
+                onClick={handleDone}
+              >
+                {copy.done}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 function Metric({
   metricKey,
   label,
@@ -3847,6 +4172,10 @@ function SessionRecapPanel({
   const [calMetric, setCalMetric] = useState<"cost" | "tokens" | "sessions">(
     "cost",
   );
+  const [recapOpen, setRecapOpen] = useState(() => {
+    const stored = localStorage.getItem("superview-recap-open");
+    return stored !== null ? stored === "true" : true;
+  });
 
   const totals = useMemo(() => {
     let sessions = journeys.length;
@@ -4087,7 +4416,11 @@ function SessionRecapPanel({
 
   if (journeys.length === 0) {
     return (
-      <details className="session-recap">
+      <details className="session-recap" open={recapOpen} onToggle={(e) => {
+        const open = (e.target as HTMLDetailsElement).open;
+        setRecapOpen(open);
+        localStorage.setItem("superview-recap-open", String(open));
+      }}>
         <summary>
           <span className="caret">▸</span>
           {copy.recapToggle}
@@ -4112,7 +4445,11 @@ function SessionRecapPanel({
   const toolMax = toolList.length > 0 ? toolList[0][1].count : 1;
 
   return (
-    <details className="session-recap">
+    <details className="session-recap" open={recapOpen} onToggle={(e) => {
+        const open = (e.target as HTMLDetailsElement).open;
+        setRecapOpen(open);
+        localStorage.setItem("superview-recap-open", String(open));
+      }}>
       <summary>
         <span className="caret">▸</span>
         {copy.recapToggle}
@@ -4192,6 +4529,7 @@ function SessionRecapPanel({
           <span className="tag">02</span> {copy.recapRhythmHeading}
         </div>
         <div className="recap-rhythm-grid">
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="recap-rhythm-panel">
             <div className="recap-rhythm-head">
               <span className="recap-rhythm-title">
@@ -4358,28 +4696,30 @@ function SessionRecapPanel({
               </>
             )}
           </div>
-        </div>
-        {dailyTokenUsage && dailyTokenUsage.points.length > 0 ? (
-          <div className="recap-rhythm-panel" style={{ marginTop: 12 }}>
-            <div className="recap-rhythm-head">
-              <span className="recap-rhythm-title">
-                {metricsCopy.dailyUsageByDay}
-              </span>
-            </div>
-            <DailyTokenUsagePanel
-              copy={tokenChartCopy}
-              data={dailyTokenUsage}
-              loading={dailyTokenUsageLoading}
-              title={metricsCopy.tokens}
-              subtitle={metricsCopy.dailyUsageByDay}
-              maxVisiblePoints={30}
-              className=""
-              showHeaderToggle={false}
-              expanded={true}
-              onExpandedChange={() => {}}
-            />
           </div>
-        ) : null}
+          {dailyTokenUsage && dailyTokenUsage.points.length > 0 ? (
+            <div className="recap-rhythm-panel">
+              <div className="recap-rhythm-head">
+                <span className="recap-rhythm-title">
+                  {metricsCopy.dailyUsageByDay}
+                </span>
+              </div>
+              <DailyTokenUsagePanel
+                copy={tokenChartCopy}
+                data={dailyTokenUsage}
+                loading={dailyTokenUsageLoading}
+                title={metricsCopy.tokens}
+                subtitle={metricsCopy.dailyUsageByDay}
+                maxVisiblePoints={30}
+                className=""
+                showHeaderToggle={false}
+                expanded={true}
+                onExpandedChange={() => {}}
+                variant="horizon"
+              />
+            </div>
+          ) : null}
+        </div>
 
         {/* 03 Efficiency */}
         <div className="recap-eyebrow">
