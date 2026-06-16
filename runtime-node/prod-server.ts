@@ -19,6 +19,6 @@ app.use((req, res, next) => {
 export function startProdServer(port?: number) {
   const p = port ?? Number(process.env.SUPERVIEW_PORT ?? 5174);
   return app.listen(p, "0.0.0.0", () => {
-    console.log(`SuperView running at http://0.0.0.0:${p}`);
+    console.log(`SuperView running at http://127.0.0.1:${p}`);
   });
 }
