@@ -8,6 +8,7 @@ import {
   FileText,
   Languages,
   Leaf,
+  Map as MapIcon,
   Moon,
   Pause,
   Play,
@@ -828,7 +829,7 @@ export function App() {
               setTourOpen(true);
             }}
           >
-            <RotateCw size={16} />
+            <MapIcon size={16} />
           </button>
           <button
             className="shell-button language-toggle-button"
@@ -1499,7 +1500,7 @@ function ContextReplayPanel({
     }
     const timer = setTimeout(
       () => activateSnapshot(activeSnapshotIndex + 1),
-      2800,
+      2000,
     );
     return () => clearTimeout(timer);
   }, [replayPlaying, activeSnapshotIndex, replay]);
@@ -3366,17 +3367,59 @@ function OnboardingTour({
   const currentPadding = targetPaddings[step] ?? 10;
   const currentPlacement = targetPlacements[step] ?? "bottom";
 
+  const journeyTargetSelectors = [
+    ".context-replay-panel",
+    ".context-replay-summary",
+    ".context-factory-strip",
+  ];
   useLayoutEffect(() => {
     if (window.innerWidth < 760) return;
+    function openAncestorDetails(el: Element) {
+      let cur: Element | null = el;
+      while (cur) {
+        if (cur instanceof HTMLDetailsElement && !cur.open) {
+          cur.open = true;
+        }
+        cur = cur.parentElement;
+      }
+    }
+    let el = currentSelector
+      ? document.querySelector(currentSelector)
+      : null;
+    // If targeting elements inside a journey and none found, expand the first journey
+    if (!el && currentSelector && journeyTargetSelectors.includes(currentSelector)) {
+      const firstItem: HTMLElement | null = document.querySelector(".conversation-master-item");
+      if (firstItem) firstItem.click();
+      setTimeout(() => {
+        const retry = currentSelector ? document.querySelector(currentSelector) : null;
+        if (retry) {
+          openAncestorDetails(retry);
+          retry.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300);
+      setTargetRect(null);
+      return;
+    }
+    // Auto-open the factory popover when tour targets the Context Timeline strip
+    if (currentSelector === ".context-factory-strip" && !document.querySelector(".factory-overlay")) {
+      const btn: HTMLElement | null = document.querySelector(".factory-expand-btn");
+      if (btn) btn.click();
+    }
+    if (!el) {
+      setTargetRect(null);
+      return;
+    }
+    openAncestorDetails(el);
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
     function recalc() {
-      const el = currentSelector
+      const fresh = currentSelector
         ? document.querySelector(currentSelector)
         : null;
-      if (!el) {
+      if (!fresh) {
         setTargetRect(null);
         return;
       }
-      const raw = el.getBoundingClientRect();
+      const raw = fresh.getBoundingClientRect();
       setTargetRect(
         new DOMRect(
           raw.left - currentPadding,

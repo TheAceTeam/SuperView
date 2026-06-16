@@ -5,7 +5,7 @@
 ## 快速开始
 
 ```bash
-npx @seanxdo/superview
+npx --yes @seanxdo/superview@latest
 ```
 
 或全局安装：

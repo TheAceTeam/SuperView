@@ -552,7 +552,7 @@ export const COPY: Record<Language, AppCopy> = {
       steps: [
         {
           title: "Scan Agent Logs",
-          detail: "Point SuperView at your Codex, Claude Code, or OpenCode log directory to start indexing agent runs."
+          detail: "Point SuperView at your Codex, Claude Code, or OpenCode log directory to begin indexing agent runs."
         },
         {
           title: "Switch Projects",
@@ -560,19 +560,19 @@ export const COPY: Record<Language, AppCopy> = {
         },
         {
           title: "Session Recap",
-          detail: "A collapsible black-box readout: sessions, tokens, costs, tool usage, daily rhythm, and efficiency gauges — all in one panel."
+          detail: "A collapsible analytics dashboard: sessions, tokens, cost, daily activity calendar, when-you-ship heatmap, efficiency gauges, tool usage, and spend by model."
         },
         {
           title: "Daily Token Usage",
-          detail: "Vertical bar chart of token consumption per day, segmented by input, output, cached, and reasoning tokens."
+          detail: "Horizon chart showing daily token consumption in compact layered bands — cached input, input, output, and reasoning tokens — stacked side by side with the rhythm panels."
         },
         {
           title: "User Input",
-          detail: "Every user message becomes a task journey. Click any journey to expand its tool calls, evidence, and context replay."
+          detail: "Every user message spawns a task journey. Click any journey to expand its tool calls, evidence, and context replay."
         },
         {
           title: "Context Replay",
-          detail: "Step through the agent's context window snapshot-by-snapshot. Watch how context blocks are added, changed, and dropped over time."
+          detail: "Step through the agent's context window snapshot-by-snapshot. Watch context blocks added, modified, and dropped over time."
         },
         {
           title: "Context Replay Summary",
@@ -584,7 +584,7 @@ export const COPY: Record<Language, AppCopy> = {
         },
         {
           title: "Theme & Language",
-          detail: "Switch between 4 themes (light, dark, forest, plasma) or toggle Simplified Chinese and English."
+          detail: "Switch between 4 themes (light, dark, forest, plasma), toggle English / 中文, or click the Map button in the topbar to restart this tour anytime."
         }
       ]
     }
@@ -883,35 +883,35 @@ export const COPY: Record<Language, AppCopy> = {
         },
         {
           title: "切换项目",
-          detail: "浏览所有已索引的项目。按来源过滤，选择一个项目查看其时间线。"
+          detail: "浏览所有已索引的项目。按 provider 筛选，选择一个项目查看其时间线。"
         },
         {
           title: "会话概览",
-          detail: "可折叠的黑匣子面板：会话数、Token 用量、费用、工具用量、每日节奏和效率指标，一览无余。"
+          detail: "可折叠的分析仪表盘：会话数、Token 消耗、成本、每日活动日历、按时段热力图、效率指标、工具用量和按模型支出。"
         },
         {
           title: "每日 Token 用量",
-          detail: "按天统计的 Token 消耗柱状图，按输入、输出、缓存和推理 Token 分段显示。"
+          detail: "Horizon 图以紧凑分层色带展示每日 Token 消耗：缓存输入、输入、输出和推理 Token，与节奏面板并排陈列。"
         },
         {
           title: "用户输入",
-          detail: "每条用户消息都是一个任务旅程。点击任意旅程展开工具调用、证据和上下文回放。"
+          detail: "每条用户消息生成一个任务旅程。点击任意旅程展开工具调用、证据和上下文回放。"
         },
         {
           title: "上下文回放",
-          detail: "逐步浏览 Agent 上下文窗口的每个快照。观察上下文块的添加、变更和丢弃过程。"
+          detail: "逐快照步进浏览 Agent 上下文窗口。观察上下文块的添加、修改和移除过程。"
         },
         {
           title: "上下文回放摘要",
-          detail: "当前回放会话的快速概览：快照总数、上下文块数量、警告和事件计数。"
+          detail: "当前回放会话的快速概览：快照总数、上下文块数量、风险点和事件计数。"
         },
         {
           title: "上下文时间线",
-          detail: "全宽工厂流水线视图，展示所有快照及其活跃上下文块。一目了然地查看整个上下文流转。"
+          detail: "全宽工厂流水线视图，展示每个快照及其活跃上下文块随时间流动。一目了然。"
         },
         {
           title: "主题与语言",
-          detail: "在 4 种主题（明亮、暗色、森林、等离子紫）间切换，或切换简体中文和英文。"
+          detail: "4 种主题（明亮/暗色/森林/等离子紫）切换，中英文切换，或点击顶栏 Map 按钮随时重新开始此引导。"
         }
       ]
     }
