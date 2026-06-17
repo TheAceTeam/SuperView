@@ -15,7 +15,15 @@ npm install -g @seanxdo/superview
 superview
 ```
 
-然后打开 **http://0.0.0.0:5174**，扫描你的 agent 日志即可。
+从指定项目目录启动——SuperView 会自动扫描并默认选中该项目：
+
+```bash
+superview .                          # 当前目录
+superview /path/to/your/project      # 绝对路径
+superview --project-dir=/path/to/project
+```
+
+然后打开 **http://127.0.0.1:5174**，扫描你的 agent 日志即可。
 
 SuperView 是一个本地优先的 coding agent 飞行记录器。它会读取 Codex、Claude Code 和 OpenCode 的 session 日志，重建每一轮任务旅程，并将隐藏的 agent 工作——上下文快照、工具调用、成本、错误和项目遥测——呈现在一个统一的仪表盘中。
 
@@ -38,7 +46,7 @@ SuperView 是一个本地优先的 coding agent 飞行记录器。它会读取 C
 
 ### 会话概览
 
-可折叠的黑匣子面板，包含五个模块：
+可折叠的飞行记录仪面板，包含五个模块：
 
 - **01 总览** — 会话数、预估成本、Token 总量、工具调用次数、错误数、最常用模型、最忙一天和最贵项目。
 - **02 节奏** — 每日活动日历热力图、小时×星期时钟热力图、每日 Token 用量图表。

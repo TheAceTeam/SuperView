@@ -15,7 +15,15 @@ npm install -g @seanxdo/superview
 superview
 ```
 
-Then open **http://0.0.0.0:5174** and scan your agent logs.
+Launch pre-focused on a project directory — SuperView auto-scans and selects that project on open:
+
+```bash
+superview .                          # current directory
+superview /path/to/your/project      # absolute path
+superview --project-dir=/path/to/project
+```
+
+Then open **http://127.0.0.1:5174** and scan your agent logs.
 
 SuperView is a local-first flight recorder for coding agents. It ingests session logs from Codex, Claude Code, and OpenCode, reconstructs every task journey, and surfaces hidden agent work — context snapshots, tool calls, cost, errors, and project telemetry — in a single dashboard.
 
@@ -38,7 +46,7 @@ SuperView is a local-first flight recorder for coding agents. It ingests session
 
 ### Session Recap
 
-A collapsible black-box readout panel with five sections:
+A collapsible flight-recorder readout panel with five sections:
 
 - **01 Readout** — Sessions, estimated cost, total tokens, tool calls, errors, most-used model, busiest day, and priciest session.
 - **02 Rhythm** — Daily activity calendar heatmap, hour×weekday clock heatmap, and daily token usage chart.
