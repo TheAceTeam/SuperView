@@ -81,6 +81,12 @@ export async function fetchRun(sessionId: string): Promise<RunReplay & { artifac
   return (await response.json()) as RunReplay & { artifacts: Artifact[] };
 }
 
+export async function fetchConfig(): Promise<{ projectDir: string | null }> {
+  const response = await fetch("/api/config");
+  if (!response.ok) throw new Error("Failed to load config");
+  return (await response.json()) as { projectDir: string | null };
+}
+
 export async function resetDatabase(): Promise<void> {
   await fetch("/api/reset", { method: "POST" });
 }

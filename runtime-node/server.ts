@@ -4,14 +4,30 @@ import { buildContextReplay } from "../core/contextReplay";
 import { SuperViewDatabase } from "../storage/database";
 import { IngestService } from "./ingest";
 
-export function createServer() {
+export function createServer(opts?: { projectDir?: string }) {
   const db = new SuperViewDatabase();
   const ingest = new IngestService(db);
   const app = express();
+
+  if (opts?.projectDir) {
+    const result = ingest.start({
+      sources: [
+        { provider: "codex" },
+        { provider: "claude-code" },
+        { provider: "opencode" },
+      ]
+    });
+    console.log(`Auto-scan started for ${opts.projectDir} (job: ${result.job.id})`);
+  }
+
   app.use(express.json());
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.get("/api/config", (_req, res) => {
+    res.json({ projectDir: opts?.projectDir ?? null });
   });
 
   app.post("/api/ingest", (req, res) => {

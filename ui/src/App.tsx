@@ -5,6 +5,7 @@ import {
   ChartColumn,
   ChevronDown,
   Clock,
+  ExternalLink,
   FileText,
   Languages,
   Leaf,
@@ -44,6 +45,7 @@ import type {
   TokenUsage,
 } from "../../core/types";
 import {
+  fetchConfig,
   fetchContextReplay,
   fetchDailyTokenUsage,
   fetchIngestJob,
@@ -217,6 +219,16 @@ export function App() {
 
   useEffect(() => {
     if (!selectedProjectId) return;
+    const project = projects.find((p) => p.id === selectedProjectId);
+    if (project?.cwd) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("project", project.cwd);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, [selectedProjectId, projects]);
+
+  useEffect(() => {
+    if (!selectedProjectId) return;
     void loadTimeline(selectedProjectId);
   }, [selectedProjectId]);
 
@@ -377,8 +389,42 @@ export function App() {
     setLoading(true);
     try {
       const next = await fetchProjects();
+      let autoSelectId: string | null = null;
+
+      // Server config (--project-dir) takes priority
+      try {
+        const config = await fetchConfig();
+        if (config.projectDir) {
+          const match = next.find(
+            (p) => p.cwd === config.projectDir || p.cwd?.endsWith(config.projectDir!),
+          );
+          if (match) autoSelectId = match.id;
+        }
+      } catch { /* best-effort */ }
+
+      // Fall back to URL ?project=<cwd>
+      if (!autoSelectId) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlProject = urlParams.get("project");
+        if (urlProject) {
+          const match = next.find(
+            (p) => p.cwd === urlProject || p.cwd?.endsWith(urlProject),
+          );
+          if (match) autoSelectId = match.id;
+        }
+      }
+      if (autoSelectId) {
+        const project = next.find((p) => p.id === autoSelectId);
+        if (project?.cwd) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("project", project.cwd);
+          window.history.replaceState(null, "", url.toString());
+        }
+      }
       setProjects(next);
-      setSelectedProjectId((current) => current ?? next[0]?.id ?? null);
+      setSelectedProjectId(
+        (current) => current ?? autoSelectId ?? next[0]?.id ?? null,
+      );
       setError(null);
     } catch (loadError) {
       setError(
@@ -637,6 +683,16 @@ export function App() {
           <span>{copy.brandSubtitle}</span>
         </div>
         <div className="topbar-actions">
+          <a
+            className="icon-button"
+            href="https://github.com/TheAceTeam/SuperView"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+          >
+            <ExternalLink size={16} />
+          </a>
           <div className="scan-dropdown">
             <button
               className="shell-button scan-dropdown-trigger"
