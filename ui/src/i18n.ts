@@ -65,7 +65,7 @@ export type AppCopy = {
     };
   };
   topbar: { agentLogRoot: string; agentLogRootAria: string; agentLogRootPlaceholder: string; source: string; sourceAria: string; scan: string };
-  title: { eyebrow: string; emptyProject: string; lead: string };
+  title: { eyebrow: string; emptyProject: string; lead: string; share: string; shareCopied: string; shareCardTitle: string; shareCopy: string; shareCopyMarkdown: string; shareDownloadPng: string; shareClose: string; sharePngSaved: string; shareUsageByDay: string };
   projectControls: { provider: string; providerAria: string; project: string; projectAria: string; all: string; noProvider: string };
   metrics: { projects: string; events: string; tasks: string; tokens: string; kvHit: string; cost: string; showDailyTokens: string; hideDailyTokens: string; dailyUsageByDay: string };
   empty: {
@@ -289,7 +289,16 @@ export const COPY: Record<Language, AppCopy> = {
     title: {
       eyebrow: "Project Flight Recorder",
       emptyProject: "No project indexed yet",
-      lead: ""
+      lead: "",
+      share: "Share",
+      shareCopied: "Summary copied to clipboard",
+      shareCardTitle: "Project recap",
+      shareCopy: "Copy",
+      shareCopyMarkdown: "Copy as Markdown",
+      shareDownloadPng: "Download PNG",
+      shareClose: "Close",
+      sharePngSaved: "Image saved",
+      shareUsageByDay: "Usage by day"
     },
     projectControls: {
       provider: "Provider",
@@ -620,7 +629,16 @@ export const COPY: Record<Language, AppCopy> = {
     title: {
       eyebrow: "Project Flight Recorder",
       emptyProject: "还没有索引项目",
-      lead: ""
+      lead: "",
+      share: "分享",
+      shareCopied: "摘要已复制到剪贴板",
+      shareCardTitle: "项目概览",
+      shareCopy: "复制",
+      shareCopyMarkdown: "复制为 Markdown",
+      shareDownloadPng: "下载图片",
+      shareClose: "关闭",
+      sharePngSaved: "图片已保存",
+      shareUsageByDay: "按天用量"
     },
     projectControls: {
       provider: "来源",

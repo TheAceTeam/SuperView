@@ -519,6 +519,30 @@ select:disabled {
   margin-bottom: 18px;
 }
 
+.title-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.title-heading-row h1 {
+  margin-bottom: 0;
+}
+
+.title-share-button {
+  flex: none;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--line);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.title-share-button:hover {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+
 .eyebrow {
   margin: 0 0 10px;
   color: var(--orange);
@@ -2333,6 +2357,56 @@ button.context-warning:disabled {
   gap: 16px;
   padding: 22px 24px 18px;
   min-width: 0;
+}
+
+.project-share-metrics {
+  display: grid;
+  gap: 2px;
+}
+
+.project-share-metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.project-share-metric:last-child {
+  border-bottom: none;
+}
+
+.project-share-metric-label {
+  color: var(--muted);
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.project-share-metric-value {
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.project-share-daily {
+  display: grid;
+  gap: 8px;
+}
+
+.project-share-daily-label {
+  color: var(--muted);
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.project-share-daily .share-card-spark {
+  height: 60px;
 }
 
 .share-card-hero {

@@ -5,8 +5,8 @@ import {
   ChartColumn,
   ChevronDown,
   Clock,
-  ExternalLink,
   FileText,
+  Github,
   Languages,
   Leaf,
   Map as MapIcon,
@@ -142,6 +142,9 @@ export function App() {
   const [scanPanelOpen, setScanPanelOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const shareToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [projectShareOpen, setProjectShareOpen] = useState(false);
   const [dropzoneOpen, setDropzoneOpen] = useState(false);
   const dropzoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pricing, setPricing] = useState<ModelPricing[]>(() =>
@@ -659,6 +662,13 @@ export function App() {
       priciestCost,
     };
   }, [journeys, pricing, sessionMap]);
+
+  function showShareToast(msg: string) {
+    clearTimeout(shareToastTimer.current ?? undefined);
+    setShareToast(msg);
+    shareToastTimer.current = setTimeout(() => setShareToast(null), 2500);
+  }
+
   const ingestBusy = isIngestBusy(job);
   const blockingMessage = getBlockingMessage({
     copy,
@@ -691,7 +701,7 @@ export function App() {
             aria-label="GitHub"
             title="GitHub"
           >
-            <ExternalLink size={16} />
+            <Github size={16} />
           </a>
           <div className="scan-dropdown">
             <button
@@ -905,7 +915,20 @@ export function App() {
         <section className="title-row">
           <div>
             <p className="eyebrow">{copy.title.eyebrow}</p>
-            <h1>{selectedProject?.name ?? copy.title.emptyProject}</h1>
+            <div className="title-heading-row">
+              <h1>{selectedProject?.name ?? copy.title.emptyProject}</h1>
+              {selectedProject && recapSummaryLine ? (
+                <button
+                  type="button"
+                  className="icon-button title-share-button"
+                  onClick={() => setProjectShareOpen(true)}
+                  aria-label={copy.title.share}
+                  title={copy.title.share}
+                >
+                  <Share2 size={15} />
+                </button>
+              ) : null}
+            </div>
             <p className="lead">{copy.title.lead}</p>
           </div>
           {recapSummaryLine ? (
@@ -1048,6 +1071,286 @@ export function App() {
           }}
         />
       ) : null}
+      {projectShareOpen && selectedProject && recapSummaryLine ? (
+        <ProjectShareCard
+          copy={copy.title}
+          projectName={selectedProject.name}
+          summary={recapSummaryLine}
+          tokenUsage={projectTokenUsage}
+          dailyUsage={dailyTokenUsage}
+          repoUrl="https://github.com/TheAceTeam/SuperView"
+          onClose={() => setProjectShareOpen(false)}
+          onToast={showShareToast}
+        />
+      ) : null}
+      {shareToast ? (
+        <div className="share-toast" role="status" aria-live="polite">
+          {shareToast}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ProjectShareCard({
+  copy,
+  projectName,
+  summary,
+  tokenUsage,
+  dailyUsage,
+  repoUrl,
+  onClose,
+  onToast,
+}: {
+  copy: AppCopy["title"];
+  projectName: string;
+  summary: {
+    spanDays: number;
+    sessions: number;
+    cost: number;
+    hours: number;
+    favModel: string;
+    priciestName: string;
+    priciestCost: number;
+  };
+  tokenUsage: TokenUsage;
+  dailyUsage: DailyTokenUsageResponse | null;
+  repoUrl: string;
+  onClose: () => void;
+  onToast: (msg: string) => void;
+}) {
+  const kv = formatKvHitRate(tokenUsage);
+  const dateLabel = new Date().toLocaleDateString();
+  const dailyPoints = (dailyUsage?.points ?? []).map((p) => ({
+    date: p.date,
+    total: p.total,
+  }));
+  const maxDaily = Math.max(1, ...dailyPoints.map((p) => p.total));
+  const metrics: { label: string; value: string }[] = [
+    {
+      label: "Sessions",
+      value: `${summary.sessions} · ${summary.spanDays} day${summary.spanDays !== 1 ? "s" : ""}`,
+    },
+    {
+      label: "Cost",
+      value: `${formatCost(summary.cost)} · ${summary.hours.toFixed(1)}h`,
+    },
+    {
+      label: "Tokens",
+      value: `${formatMillionTokens(tokenUsage.total)} · KV ${kv}`,
+    },
+    { label: "Top model", value: summary.favModel },
+  ];
+  if (summary.priciestName) {
+    metrics.push({
+      label: "Priciest area",
+      value: `${summary.priciestName} (${formatCost(summary.priciestCost)})`,
+    });
+  }
+
+  function buildPlainText() {
+    const lines = [
+      `${projectName} — SuperView project recap`,
+      "",
+      ...metrics.map((m) => `• ${m.label}: ${m.value}`),
+      "",
+      `Captured with SuperView — ${repoUrl}`,
+    ];
+    return lines.join("\n");
+  }
+
+  function buildMarkdown() {
+    const lines = [
+      `## ${projectName} — SuperView project recap`,
+      "",
+      ...metrics.map((m) => `- **${m.label}:** ${m.value}`),
+      "",
+      `_${projectName} · ${dateLabel} · SuperView — ${repoUrl}_`,
+    ];
+    return lines.join("\n");
+  }
+
+  async function handleCopyPlain() {
+    try {
+      await navigator.clipboard.writeText(buildPlainText());
+      onToast(copy.shareCopied);
+    } catch {
+      onToast("Failed to copy");
+    }
+  }
+
+  async function handleCopyMarkdown() {
+    try {
+      await navigator.clipboard.writeText(buildMarkdown());
+      onToast(copy.shareCopied);
+    } catch {
+      onToast("Failed to copy");
+    }
+  }
+
+  function handleDownloadPng() {
+    const cs = getComputedStyle(document.documentElement);
+    const v = (name: string, fallback: string) =>
+      cs.getPropertyValue(name).trim() || fallback;
+    const paper = v("--paper", "#fcfaf7");
+    const ink = v("--ink", "#423d38");
+    const muted = v("--muted", "#797067");
+    const orange = v("--orange", "#fe6e00");
+    const line = v("--line", "#e3e0dd");
+    const esc = (s: string) =>
+      s
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    const W = 640;
+    const metricsBottom = 150 + metrics.length * 56;
+    const chartH = dailyPoints.length > 0 ? 110 : 0;
+    const H = metricsBottom + chartH + 64;
+    const rows = metrics
+      .map((m, i) => {
+        const y = 150 + i * 56;
+        return `
+          <text x="48" y="${y}" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="${muted}" letter-spacing="0.5">${esc(m.label.toUpperCase())}</text>
+          <text x="48" y="${y + 24}" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="20" font-weight="600" fill="${ink}">${esc(m.value)}</text>
+          <line x1="48" y1="${y + 38}" x2="${W - 48}" y2="${y + 38}" stroke="${line}" stroke-width="1" />`;
+      })
+      .join("");
+    let chart = "";
+    if (dailyPoints.length > 0) {
+      const chartTop = metricsBottom + 8;
+      const barAreaH = 70;
+      const baseline = chartTop + 20 + barAreaH;
+      const chartLeft = 48;
+      const chartRight = W - 48;
+      const gap = 3;
+      const barW = Math.max(
+        2,
+        (chartRight - chartLeft - gap * (dailyPoints.length - 1)) / dailyPoints.length,
+      );
+      const bars = dailyPoints
+        .map((p, i) => {
+          const h = Math.max(3, (p.total / maxDaily) * barAreaH);
+          const x = chartLeft + i * (barW + gap);
+          const y = baseline - h;
+          return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1" fill="${orange}" />`;
+        })
+        .join("");
+      chart = `
+        <text x="48" y="${chartTop + 12}" font-family="ui-monospace, Menlo, monospace" font-size="13" fill="${muted}" letter-spacing="0.5">${esc(copy.shareUsageByDay.toUpperCase())}</text>
+        ${bars}`;
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <rect width="${W}" height="${H}" fill="${paper}" rx="20" />
+      <text x="48" y="56" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="14" font-weight="700" fill="${orange}" letter-spacing="1">SUPERVIEW · PROJECT RECAP</text>
+      <text x="48" y="100" font-family="-apple-system, Segoe UI, Roboto, sans-serif" font-size="34" font-weight="700" fill="${ink}">${esc(projectName)}</text>
+      ${rows}
+      ${chart}
+      <text x="48" y="${H - 28}" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="${muted}">${esc(`${dateLabel} · ${repoUrl}`)}</text>
+    </svg>`;
+    const scale = 2;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = W * scale;
+      canvas.height = H * scale;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        onToast("Failed to render image");
+        return;
+      }
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          onToast("Failed to render image");
+          return;
+        }
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = `superview-${projectName.replace(/[^a-z0-9_-]+/gi, "-")}.png`;
+        a.click();
+        URL.revokeObjectURL(objectUrl);
+        onToast(copy.sharePngSaved);
+      }, "image/png");
+    };
+    img.onerror = () => onToast("Failed to render image");
+    img.src =
+      "data:image/svg+xml;base64," +
+      btoa(unescape(encodeURIComponent(svg)));
+  }
+
+  return (
+    <div className="share-overlay" onClick={onClose}>
+      <div className="share-card" onClick={(e) => e.stopPropagation()}>
+        <div className="share-card-header">
+          <div className="share-card-header-brand">
+            <strong>SuperView</strong>
+            <span>{copy.shareCardTitle}</span>
+          </div>
+          <button
+            type="button"
+            className="share-card-close"
+            onClick={onClose}
+            aria-label={copy.shareClose}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="share-card-body">
+          <div className="share-card-hero">
+            <div className="share-card-hero-stat">{formatCost(summary.cost)}</div>
+            <div className="share-card-hero-caption">{projectName}</div>
+          </div>
+
+          <div className="project-share-metrics">
+            {metrics.map((m) => (
+              <div className="project-share-metric" key={m.label}>
+                <span className="project-share-metric-label">{m.label}</span>
+                <span className="project-share-metric-value">{m.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {dailyPoints.length > 0 ? (
+            <div className="project-share-daily">
+              <span className="project-share-daily-label">{copy.shareUsageByDay}</span>
+              <div className="share-card-spark" role="img" aria-label={copy.shareUsageByDay}>
+                {dailyPoints.map((p) => {
+                  const height = Math.max(6, Math.round((p.total / maxDaily) * 100));
+                  return (
+                    <span
+                      key={p.date}
+                      className="share-card-spark-bar"
+                      style={{ height: `${height}%`, background: "var(--orange)" }}
+                      title={`${p.date} · ${formatMillionTokens(p.total)}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="share-card-stats-footer">
+            <span className="share-card-stats-project">
+              {projectName} · {dateLabel} · SuperView
+            </span>
+          </div>
+        </div>
+
+        <div className="share-card-actions">
+          <button type="button" className="share-card-btn" onClick={handleCopyPlain}>
+            {copy.shareCopy}
+          </button>
+          <button type="button" className="share-card-btn" onClick={handleCopyMarkdown}>
+            {copy.shareCopyMarkdown}
+          </button>
+          <button type="button" className="share-card-btn" onClick={handleDownloadPng}>
+            {copy.shareDownloadPng}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
