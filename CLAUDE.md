@@ -75,3 +75,8 @@ In QA mode, flag any code that does not match `DESIGN.md`.
 SuperView is a web app/dashboard for Codex users. Its job is to make coding-agent logs feel like a replayable trace map, not a raw transcript.
 
 The memorable first impression is: "wow, I have never seen a coding agent from this angle."
+
+### Design Context
+Read `PRODUCT.md` before any design or UI work — it carries the strategic frame (register: `product`, users, purpose, brand personality, anti-references, and the 5 design principles). `DESIGN.md` carries the visual system (color, type, components); `PRODUCT.md` carries the "who/what/why".
+
+Today's true north is the **flight-recorder dashboard**. The Mario-like "Agent Run" platformer in `DESIGN.md` is shelved/aspirational — treat the dashboard as the product unless the owner revives it explicitly.
