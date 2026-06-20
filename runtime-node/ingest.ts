@@ -153,6 +153,12 @@ export async function runIngestJob(db: SuperViewDatabase, jobId: string, ingestO
       }
     }
 
+    // Parse the most recently active sessions first. The project the user just
+    // launched superview from is the one they're actively working in, so its log
+    // has the newest mtime — this surfaces it in the list within seconds instead
+    // of minutes, letting launch-dir auto-select land quickly.
+    candidates.sort((a, b) => b.source.mtimeMs - a.source.mtimeMs);
+
     job.skippedFiles = skippedFiles;
     job.changedFiles = candidates.length;
     job.processedFiles = skippedFiles;

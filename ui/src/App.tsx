@@ -65,6 +65,7 @@ import {
   startIngest,
 } from "./api";
 import { DailyTokenUsagePanel } from "./DailyTokenUsagePanel";
+import { resolveAutoSelectId } from "./autoSelect";
 import { AppCopy, COPY, IngestCopy, Language, TourCopy, normalizeLanguage } from "./i18n";
 import { formatMillionTokens } from "./tokenFormat";
 import {
@@ -112,6 +113,14 @@ export function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
   );
+  // Server --project-dir (launch dir). Drives auto-select once that project is ingested.
+  const [serverProjectDir, setServerProjectDir] = useState<string | null>(null);
+  // ?project= captured once at mount, before effects rewrite the URL from the selection.
+  const initialUrlProject = useRef<string | null>(
+    new URLSearchParams(window.location.search).get("project"),
+  );
+  // Locks once we've delivered the user to the launch-dir/url target, or they pick manually.
+  const autoSelectDone = useRef(false);
   const [timeline, setTimeline] = useState<ProjectTimeline | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [dailyTokenUsage, setDailyTokenUsage] =
@@ -260,13 +269,52 @@ export function App() {
       setSelectedEvent(null);
       return;
     }
-    if (
-      !selectedProjectId ||
-      !filtered.some((project) => project.id === selectedProjectId)
-    ) {
+    const currentValid =
+      !!selectedProjectId &&
+      filtered.some((project) => project.id === selectedProjectId);
+    // Until we've settled on the launch-dir/url target, keep retrying as the
+    // scan grows the list — the target project may not be ingested yet on the
+    // first pass. Once it appears we select it; afterwards we never override.
+    if (!autoSelectDone.current) {
+      const targetId = resolveAutoSelectId(
+        filtered,
+        serverProjectDir,
+        initialUrlProject.current,
+      );
+      if (targetId) {
+        autoSelectDone.current = true;
+        if (targetId !== selectedProjectId) setSelectedProjectId(targetId);
+        return;
+      }
+    }
+    if (!currentValid) {
       setSelectedProjectId(filtered[0].id);
     }
-  }, [projects, projectProviderFilter, selectedProjectId]);
+  }, [projects, projectProviderFilter, selectedProjectId, serverProjectDir]);
+
+  // The launch-dir scan ingests projects incrementally and stays "running" for
+  // minutes, so we can't wait for job completion to refresh. Instead, while an
+  // auto-select target is pending, re-poll the project list — the target
+  // appears well before the full scan finishes, and the selection effect above
+  // latches onto it (setting autoSelectDone), which stops this poll.
+  useEffect(() => {
+    if (!serverProjectDir && !initialUrlProject.current) return;
+    if (autoSelectDone.current) return;
+    let attempts = 0;
+    const timer = window.setInterval(async () => {
+      if (autoSelectDone.current || attempts >= 45) {
+        window.clearInterval(timer);
+        return;
+      }
+      attempts += 1;
+      try {
+        setProjects(await fetchProjects());
+      } catch {
+        // ignore — next tick retries
+      }
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [serverProjectDir]);
 
   useEffect(() => {
     if (!job || job.status === "completed" || job.status === "failed") return;
@@ -401,42 +449,13 @@ export function App() {
     setLoading(true);
     try {
       const next = await fetchProjects();
-      let autoSelectId: string | null = null;
-
-      // Server config (--project-dir) takes priority
+      setProjects(next);
+      // Capture the launch dir so the selection effect can target it once that
+      // project is ingested — the first scan may not have reached it yet.
       try {
         const config = await fetchConfig();
-        if (config.projectDir) {
-          const match = next.find(
-            (p) => p.cwd === config.projectDir || p.cwd?.endsWith(config.projectDir!),
-          );
-          if (match) autoSelectId = match.id;
-        }
+        setServerProjectDir(config.projectDir ?? null);
       } catch { /* best-effort */ }
-
-      // Fall back to URL ?project=<cwd>
-      if (!autoSelectId) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlProject = urlParams.get("project");
-        if (urlProject) {
-          const match = next.find(
-            (p) => p.cwd === urlProject || p.cwd?.endsWith(urlProject),
-          );
-          if (match) autoSelectId = match.id;
-        }
-      }
-      if (autoSelectId) {
-        const project = next.find((p) => p.id === autoSelectId);
-        if (project?.cwd) {
-          const url = new URL(window.location.href);
-          url.searchParams.set("project", project.cwd);
-          window.history.replaceState(null, "", url.toString());
-        }
-      }
-      setProjects(next);
-      setSelectedProjectId(
-        (current) => current ?? autoSelectId ?? next[0]?.id ?? null,
-      );
       setError(null);
     } catch (loadError) {
       setError(
@@ -825,6 +844,7 @@ export function App() {
                         aria-selected={project.id === selectedProjectId}
                         className={`project-dropdown-item${project.id === selectedProjectId ? " active" : ""}`}
                         onClick={() => {
+                          autoSelectDone.current = true;
                           setSelectedProjectId(project.id);
                           setProjectDropdownOpen(false);
                         }}
