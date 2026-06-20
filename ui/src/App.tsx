@@ -2173,16 +2173,16 @@ function ContextReplayPanel({
             ) : null}
             <ContextBlockGroup
               copy={copy}
-              title={copy.contextReplayActiveContext}
-              blocks={groups.active}
+              title={copy.contextReplayAdded}
+              blocks={groups.added}
               blockOriginSteps={blockOriginSteps}
               selectedBlockId={selectedBlock?.id ?? null}
               onSelectBlock={handleDotOrBlockSelect}
             />
             <ContextBlockGroup
               copy={copy}
-              title={copy.contextReplayAdded}
-              blocks={groups.added}
+              title={copy.contextReplayActiveContext}
+              blocks={groups.active}
               blockOriginSteps={blockOriginSteps}
               selectedBlockId={selectedBlock?.id ?? null}
               onSelectBlock={handleDotOrBlockSelect}
