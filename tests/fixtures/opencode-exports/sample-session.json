@@ -1,20 +1,21 @@
 {
-  "session": {
+  "info": {
     "id": "ses_superview_1",
     "title": "Improve onboarding",
+    "directory": "/tmp/superview-multi-agent",
+    "version": "1.14.29",
     "time": {
       "created": 1770000000000,
       "updated": 1770000010000
-    },
-    "cwd": "/tmp/superview-multi-agent",
-    "version": "1.14.29"
+    }
   },
   "messages": [
     {
-      "id": "msg_user_1",
-      "role": "user",
-      "time": {
-        "created": 1770000000000
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1770000000000
+        }
       },
       "parts": [
         {
@@ -24,44 +25,64 @@
       ]
     },
     {
-      "id": "msg_assistant_1",
-      "role": "assistant",
-      "time": {
-        "created": 1770000005000
+      "info": {
+        "role": "assistant",
+        "providerID": "openrouter",
+        "modelID": "openrouter/elephant-alpha",
+        "time": {
+          "created": 1770000005000
+        },
+        "tokens": {
+          "total": 115,
+          "input": 90,
+          "output": 25,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 30
+          }
+        }
       },
       "parts": [
+        {
+          "type": "step-start"
+        },
         {
           "type": "text",
           "text": "I will patch the React entry view."
         },
         {
           "type": "tool",
-          "id": "tool_patch_1",
           "tool": "edit",
-          "input": {
-            "filePath": "ui/src/App.tsx"
+          "callID": "tool_patch_1",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "ui/src/App.tsx"
+            },
+            "output": "Updated ui/src/App.tsx",
+            "metadata": {
+              "output": "Updated ui/src/App.tsx"
+            },
+            "time": {
+              "start": 1770000006000,
+              "end": 1770000007000
+            }
           }
-        }
-      ],
-      "tokens": {
-        "input": 90,
-        "output": 25,
-        "cache": {
-          "read": 30
-        }
-      }
-    },
-    {
-      "id": "msg_tool_1",
-      "role": "tool",
-      "time": {
-        "created": 1770000007000
-      },
-      "toolCallId": "tool_patch_1",
-      "parts": [
+        },
         {
-          "type": "text",
-          "text": "Updated ui/src/App.tsx"
+          "type": "step-finish",
+          "reason": "stop",
+          "tokens": {
+            "total": 115,
+            "input": 90,
+            "output": 25,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 30
+            }
+          }
         }
       ]
     }

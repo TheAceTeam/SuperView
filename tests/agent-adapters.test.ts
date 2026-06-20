@@ -111,9 +111,13 @@ describe("agent log adapters", () => {
       externalSessionId: "ses_superview_1",
       cliVersion: "1.14.29"
     });
+    // The cwd must come from the v1.14.x `info.directory` field (the regression
+    // that hid every opencode project under process.cwd()).
+    expect(bundle.project.cwd).toBe("/tmp/superview-multi-agent");
     expect(bundle.events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: "user_prompt", detail: "Add onboarding empty state" }),
+        expect.objectContaining({ kind: "assistant_message", detail: expect.stringContaining("patch the React entry view") }),
         expect.objectContaining({ kind: "file_change", toolName: "edit", callId: "tool_patch_1" }),
         expect.objectContaining({ kind: "file_change", callId: "tool_patch_1", detail: expect.stringContaining("Updated ui/src/App.tsx") })
       ])
