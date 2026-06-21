@@ -89,6 +89,7 @@ type ThreadDetailTab = "conversation" | "context";
 const PROJECT_TIMELINE_LIMIT = 100000;
 
 const THEME_OPTIONS: Theme[] = ["light", "dark", "forest", "plasma", "morandi"];
+const INSIGHT_BOARD_MODE_KEY = "superview-insight-board-mode";
 
 function loadInitialTheme(): Theme {
   const stored = localStorage.getItem("superview-theme");
@@ -1731,8 +1732,17 @@ export function InsightBoard({
   activeJourneyId: string | null;
   onSelectJourney: (journeyId: string) => void;
 }) {
-  const [compact, setCompact] = useState(false);
+  const [compact, setCompact] = useState(
+    () => localStorage.getItem(INSIGHT_BOARD_MODE_KEY) !== "full",
+  );
   const modeLabel = compact ? copy.insightBoardExpand : copy.insightBoardCompact;
+  const toggleMode = () => {
+    setCompact((value) => {
+      const next = !value;
+      localStorage.setItem(INSIGHT_BOARD_MODE_KEY, next ? "compact" : "full");
+      return next;
+    });
+  };
 
   return (
     <section
@@ -1752,7 +1762,7 @@ export function InsightBoard({
             aria-label={modeLabel}
             title={modeLabel}
             aria-pressed={compact}
-            onClick={() => setCompact((value) => !value)}
+            onClick={toggleMode}
           >
             {compact ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
           </button>
