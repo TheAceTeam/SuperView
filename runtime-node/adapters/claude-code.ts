@@ -32,11 +32,21 @@ export function normalizeClaudeCodeJsonl(content: string, sourcePath: string, re
   const records = rawLines.map((line) => JSON.parse(line) as unknown);
   if (records.length === 0) return null;
 
-  const first = asRecord(records[0]);
-  const externalSessionId = stringValue(first.sessionId) ?? path.basename(sourcePath, ".jsonl");
-  const startedAt = stringValue(first.timestamp) ?? new Date(0).toISOString();
-  const cwd = projectCwdOverride ?? stringValue(first.cwd) ?? process.cwd();
-  const version = stringValue(first.version);
+  // Metadata fields aren't guaranteed on the first record — headless `claude -p`
+  // sessions open with a queue-operation that carries no cwd/version. Scan for
+  // the first record that actually has each field instead of assuming line 0.
+  const firstWith = (key: string): string | undefined => {
+    for (const recordValue of records) {
+      const value = stringValue(asRecord(recordValue)[key]);
+      if (value) return value;
+    }
+    return undefined;
+  };
+
+  const externalSessionId = firstWith("sessionId") ?? path.basename(sourcePath, ".jsonl");
+  const startedAt = firstWith("timestamp") ?? new Date(0).toISOString();
+  const cwd = projectCwdOverride ?? firstWith("cwd") ?? process.cwd();
+  const version = firstWith("version");
 
   const lines: ParsedAgentEvent[] = [
     parsedEvent({

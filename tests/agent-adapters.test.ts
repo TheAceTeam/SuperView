@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, cpSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeCodeAdapter } from "../runtime-node/adapters/claude-code";
+import { claudeCodeAdapter, normalizeClaudeCodeJsonl } from "../runtime-node/adapters/claude-code";
 import { codexAdapter } from "../runtime-node/adapters/codex";
 import { opencodeAdapter } from "../runtime-node/adapters/opencode";
 
@@ -99,6 +99,44 @@ describe("agent log adapters", () => {
     } finally {
       rmSync(sourceRoot, { recursive: true, force: true });
     }
+  });
+
+  it("reads cwd/session metadata from the first record that carries it, not just line 0", () => {
+    // Headless `claude -p` sessions open with a queue-operation line that has no
+    // cwd/version. Metadata must be recovered from the first record that has each
+    // field, otherwise cwd wrongly falls back to process.cwd().
+    const realCwd = "/Users/sean/workspace/exp/ats_cj_tests/runs/arkts/run-01/project";
+    const content = [
+      JSON.stringify({
+        type: "queue-operation",
+        operation: "enqueue",
+        sessionId: "headless-session-1",
+        timestamp: "2026-06-21T05:00:00.000Z"
+      }),
+      JSON.stringify({
+        cwd: realCwd,
+        sessionId: "headless-session-1",
+        version: "2.1.139",
+        type: "user",
+        message: { role: "user", content: "Build the fortune app" },
+        timestamp: "2026-06-21T05:00:01.000Z"
+      })
+    ].join("\n");
+
+    const bundle = requireBundle(
+      normalizeClaudeCodeJsonl(content, `${realCwd}/session.jsonl`, null)
+    );
+    expect(bundle.session).toMatchObject({
+      id: "claude-code:headless-session-1",
+      cwd: realCwd,
+      cliVersion: "2.1.139"
+    });
+    expect(bundle.project.cwd).toBe(realCwd);
+    expect(bundle.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "user_prompt", detail: "Build the fortune app" })
+      ])
+    );
   });
 
   it("normalizes OpenCode export JSON into the shared task journey model", async () => {
