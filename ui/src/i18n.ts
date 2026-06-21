@@ -104,6 +104,8 @@ export type AppCopy = {
     insightBoardAria: string;
     insightBoardTitle: string;
     insightBoardEmpty: string;
+    insightBoardCompact: string;
+    insightBoardExpand: string;
     insightScore: string;
     insightTools: string;
     insightFiles: string;
@@ -394,6 +396,8 @@ export const COPY: Record<Language, AppCopy> = {
       insightBoardAria: "High-signal task insights",
       insightBoardTitle: "Insight Board",
       insightBoardEmpty: "No high-risk runs detected.",
+      insightBoardCompact: "Compact insight board",
+      insightBoardExpand: "Expand insight board",
       insightScore: "score",
       insightTools: "tools",
       insightFiles: "files",
@@ -774,6 +778,8 @@ export const COPY: Record<Language, AppCopy> = {
       insightBoardAria: "高信号任务洞察",
       insightBoardTitle: "洞察面板",
       insightBoardEmpty: "未检测到高风险运行。",
+      insightBoardCompact: "精简洞察面板",
+      insightBoardExpand: "展开洞察面板",
       insightScore: "分数",
       insightTools: "工具",
       insightFiles: "文件",

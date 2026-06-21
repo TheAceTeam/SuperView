@@ -3878,6 +3878,36 @@ pre {
   font: 900 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+.insight-board-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.insight-mode-toggle {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--orange) 28%, var(--line));
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.insight-mode-toggle:hover,
+.insight-mode-toggle[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--orange) 56%, var(--line));
+  background: color-mix(in srgb, var(--orange-soft) 48%, var(--surface-2));
+  color: var(--orange);
+}
+
+.insight-mode-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 20%, transparent);
+}
+
 .insight-board p {
   margin: 0;
   color: var(--muted);
@@ -3945,6 +3975,39 @@ pre {
 
 .insight-card.medium .insight-score strong {
   color: var(--warning);
+}
+
+.insight-board.compact {
+  gap: 6px;
+  padding: 8px;
+}
+
+.insight-board.compact .insight-list {
+  gap: 5px;
+}
+
+.insight-board.compact .insight-card {
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 4px 8px;
+  padding: 7px;
+}
+
+.insight-board.compact .insight-score {
+  grid-row: auto;
+  min-height: 40px;
+  font-size: 8px;
+}
+
+.insight-board.compact .insight-score strong {
+  font-size: 15px;
+}
+
+.insight-board.compact .insight-copy {
+  align-content: center;
+}
+
+.insight-board.compact .insight-copy em {
+  -webkit-line-clamp: 1;
 }
 
 .insight-copy {
