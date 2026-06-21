@@ -67,7 +67,17 @@ export type AppCopy = {
       morandi: string;
     };
   };
-  topbar: { agentLogRoot: string; agentLogRootAria: string; agentLogRootPlaceholder: string; source: string; sourceAria: string; scan: string };
+  topbar: {
+    agentLogRoot: string;
+    agentLogRootAria: string;
+    agentLogRootPlaceholder: string;
+    autoUpdate: string;
+    autoUpdateOff: string;
+    autoUpdateOn: string;
+    source: string;
+    sourceAria: string;
+    scan: string;
+  };
   title: { eyebrow: string; emptyProject: string; lead: string; share: string; shareCopied: string; shareCardTitle: string; shareCopy: string; shareCopyMarkdown: string; shareDownloadPng: string; shareClose: string; sharePngSaved: string; shareUsageByDay: string };
   projectControls: { provider: string; providerAria: string; project: string; projectAria: string; all: string; noProvider: string };
   metrics: { projects: string; events: string; tasks: string; tokens: string; kvHit: string; cost: string; showDailyTokens: string; hideDailyTokens: string; dailyUsageByDay: string };
@@ -319,6 +329,9 @@ export const COPY: Record<Language, AppCopy> = {
       agentLogRoot: "Agent log root",
       agentLogRootAria: "Agent log root path",
       agentLogRootPlaceholder: "Blank scans default Codex logs",
+      autoUpdate: "Auto",
+      autoUpdateOff: "Auto update off",
+      autoUpdateOn: "Auto update on",
       source: "Source",
       sourceAria: "Agent log source",
       scan: "Scan Agent Logs"
@@ -701,6 +714,9 @@ export const COPY: Record<Language, AppCopy> = {
       agentLogRoot: "Agent 日志根目录",
       agentLogRootAria: "Agent 日志根目录路径",
       agentLogRootPlaceholder: "留空则扫描默认 Codex 日志",
+      autoUpdate: "自动",
+      autoUpdateOff: "自动更新已关闭",
+      autoUpdateOn: "自动更新已开启",
       source: "来源",
       sourceAria: "Agent 日志来源",
       scan: "扫描 Agent 日志"

@@ -26,6 +26,8 @@ import {
   Share2,
   Sparkles,
   Sun,
+  Wifi,
+  WifiOff,
   X,
   Zap,
 } from "lucide-react";
@@ -90,12 +92,25 @@ const PROJECT_TIMELINE_LIMIT = 100000;
 
 const THEME_OPTIONS: Theme[] = ["light", "dark", "forest", "plasma", "morandi"];
 const INSIGHT_BOARD_MODE_KEY = "superview-insight-board-mode";
+const AUTO_UPDATE_KEY = "superview-auto-update";
+
+function getAutoUpdateUiIntervalMs() {
+  return Number(import.meta.env.VITE_SUPERVIEW_UI_POLL_MS ?? 15_000);
+}
+
+function getAutoUpdateDbIntervalMs() {
+  return Number(import.meta.env.VITE_SUPERVIEW_DB_POLL_MS ?? 60_000);
+}
 
 function loadInitialTheme(): Theme {
   const stored = localStorage.getItem("superview-theme");
   return stored && (THEME_OPTIONS as string[]).includes(stored)
     ? (stored as Theme)
     : "light";
+}
+
+function loadInitialAutoUpdate() {
+  return localStorage.getItem(AUTO_UPDATE_KEY) !== "off";
 }
 
 function ThemeIcon({ theme, size = 17 }: { theme: Theme; size?: number }) {
@@ -108,6 +123,7 @@ function ThemeIcon({ theme, size = 17 }: { theme: Theme; size?: number }) {
 
 export function App() {
   const [theme, setTheme] = useState<Theme>(loadInitialTheme);
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(loadInitialAutoUpdate);
   const [themePanelOpen, setThemePanelOpen] = useState(false);
   const themeDropdownRef = useRef<HTMLDivElement | null>(null);
   const projectDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -185,6 +201,10 @@ export function App() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("superview-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem(AUTO_UPDATE_KEY, autoUpdateEnabled ? "on" : "off");
+  }, [autoUpdateEnabled]);
 
   useEffect(() => {
     if (!themePanelOpen) return;
@@ -354,6 +374,7 @@ export function App() {
   // Poll the selected project: refresh DB via provider-scoped scan every 60s, refresh UI every 15s
   useEffect(() => {
     if (!selectedProjectId) return;
+    if (!autoUpdateEnabled) return;
     const uiTimer = window.setInterval(async () => {
       try {
         const [nextTimeline, nextTokens] = await Promise.all([
@@ -368,7 +389,7 @@ export function App() {
       } catch {
         // silent
       }
-    }, 15000);
+    }, getAutoUpdateUiIntervalMs());
     const dbTimer = window.setInterval(async () => {
       if (isIngestBusy(jobRef.current)) return;
       try {
@@ -379,12 +400,12 @@ export function App() {
       } catch {
         // silent
       }
-    }, 60000);
+    }, getAutoUpdateDbIntervalMs());
     return () => {
       window.clearInterval(uiTimer);
       window.clearInterval(dbTimer);
     };
-  }, [selectedProjectId, agentProvider]);
+  }, [selectedProjectId, agentProvider, autoUpdateEnabled]);
 
   // Drag-and-drop JSONL import
   useEffect(() => {
@@ -868,6 +889,25 @@ export function App() {
               </div>
             ) : null}
           </div>
+          <button
+            type="button"
+            className={`shell-button auto-update-toggle${autoUpdateEnabled ? " active" : ""}`}
+            aria-label={
+              autoUpdateEnabled
+                ? copy.topbar.autoUpdateOn
+                : copy.topbar.autoUpdateOff
+            }
+            title={
+              autoUpdateEnabled
+                ? copy.topbar.autoUpdateOn
+                : copy.topbar.autoUpdateOff
+            }
+            aria-pressed={autoUpdateEnabled}
+            onClick={() => setAutoUpdateEnabled((enabled) => !enabled)}
+          >
+            {autoUpdateEnabled ? <Wifi size={16} /> : <WifiOff size={16} />}
+            <span>{copy.topbar.autoUpdate}</span>
+          </button>
           <div className="theme-dropdown" ref={themeDropdownRef}>
             <button
               className="icon-button"

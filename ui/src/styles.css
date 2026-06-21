@@ -614,6 +614,16 @@ select:disabled {
   font-weight: 900;
 }
 
+.auto-update-toggle {
+  min-width: 82px;
+  padding: 0 10px;
+}
+
+.auto-update-toggle.active {
+  border-color: color-mix(in srgb, var(--success) 45%, rgba(255, 255, 255, .22));
+  background: color-mix(in srgb, var(--success) 18%, rgba(255, 255, 255, .10));
+}
+
 .workspace {
   position: relative;
   padding: 30px 28px 42px;
