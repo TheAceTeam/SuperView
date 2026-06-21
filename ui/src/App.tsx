@@ -1766,7 +1766,6 @@ export function InsightBoard({
           {copy.insightBoardTitle}
         </span>
         <div className="insight-board-actions">
-          <em>{insights.length}</em>
           <button
             type="button"
             className="insight-mode-toggle"
