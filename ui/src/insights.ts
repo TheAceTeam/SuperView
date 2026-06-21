@@ -84,7 +84,7 @@ export function scoreJourney(
   const repeatedToolPressure = maxRepeatedToolCount(events);
 
   if (changedWithoutVerification) {
-    signals.push({ kind: "missing_verification", penalty: 42, metric: 1 });
+    signals.push({ kind: "missing_verification", penalty: 30, metric: 1 });
   }
   if (journey.status === "failed") {
     signals.push({ kind: "failed_run", penalty: 38, metric: 1 });
@@ -95,21 +95,21 @@ export function scoreJourney(
   ) {
     signals.push({
       kind: "tool_loop",
-      penalty: Math.min(28, 10 + repeatedToolPressure * 3),
+      penalty: Math.min(16, 8 + Math.round(repeatedToolPressure / 8)),
       metric: repeatedToolPressure,
     });
   }
   if (tokenTotal >= 10_000) {
     signals.push({
       kind: "high_cost",
-      penalty: Math.min(30, 10 + Math.round(tokenTotal / 5000)),
+      penalty: Math.min(18, 6 + Math.round(Math.log10(tokenTotal / 10000) * 6)),
       metric: tokenTotal,
     });
   }
   if (files >= 5) {
     signals.push({
       kind: "file_blast",
-      penalty: Math.min(24, 8 + files * 2),
+      penalty: Math.min(14, 6 + Math.round(files / 12)),
       metric: files,
     });
   }
@@ -123,19 +123,23 @@ export function scoreJourney(
   if (contextEvents >= 10) {
     signals.push({
       kind: "context_churn",
-      penalty: Math.min(20, 6 + Math.round(contextEvents / 2)),
+      penalty: Math.min(10, 4 + Math.round(contextEvents / 6)),
       metric: contextEvents,
     });
   }
 
-  const totalPenalty = signals.reduce((sum, signal) => sum + signal.penalty, 0);
+  const verificationCredit = Math.min(12, verificationEvents * 2);
+  const totalPenalty = Math.max(
+    0,
+    signals.reduce((sum, signal) => sum + signal.penalty, 0) - verificationCredit,
+  );
   const score = Math.max(0, Math.min(100, 100 - totalPenalty));
   const primaryKind = [...signals].sort((a, b) => b.penalty - a.penalty)[0]?.kind ?? "high_cost";
 
   return {
     id: `insight-${journey.id}`,
     journeyId: journey.id,
-    severity: score < 40 ? "high" : score < 60 ? "medium" : "low",
+    severity: score < 60 ? "high" : score <= 80 ? "medium" : "low",
     score,
     title: journey.title,
     primaryKind,

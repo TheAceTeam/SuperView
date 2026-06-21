@@ -30,6 +30,54 @@ describe("journey insights", () => {
     );
   });
 
+  it("keeps large iterative sessions above zero so bad runs remain comparable", () => {
+    const eventIds = [
+      "prompt",
+      "change",
+      ...Array.from({ length: 52 }, (_, index) => `tool-${index}`),
+      ...Array.from({ length: 10 }, (_, index) => `error-${index}`),
+      ...Array.from({ length: 20 }, (_, index) => `context-${index}`),
+      ...Array.from({ length: 8 }, (_, index) => `verify-${index}`),
+    ];
+    const journey = makeJourney("j-large-iterative", {
+      tokenUsage: { input: 470000, output: 7000, reasoning: 0, cachedInput: 0, total: 477000 },
+      eventIds,
+    });
+    const events = new Map([
+      ["prompt", event("prompt", "user_prompt", "Product", "Large iterative task")],
+      [
+        "change",
+        event("change", "file_change", "Code", "Patch", {
+          files: Array.from({ length: 70 }, (_, index) => `file-${index}.ts`),
+        }),
+      ],
+      ...Array.from({ length: 52 }, (_, index) => [
+        `tool-${index}`,
+        event(`tool-${index}`, "tool_call", "Code", "Read", { toolName: "exec_command" }),
+      ] as const),
+      ...Array.from({ length: 10 }, (_, index) => [
+        `error-${index}`,
+        event(`error-${index}`, "error", "Risks", "Error", { status: "failed" }),
+      ] as const),
+      ...Array.from({ length: 20 }, (_, index) => [
+        `context-${index}`,
+        event(`context-${index}`, "tool_result", "Agent Runs", "Context"),
+      ] as const),
+      ...Array.from({ length: 8 }, (_, index) => [
+        `verify-${index}`,
+        event(`verify-${index}`, "verification", "Verification", "Verified"),
+      ] as const),
+    ]);
+
+    const insight = scoreJourney(journey, events);
+
+    expect(insight.score).toBeGreaterThan(20);
+    expect(insight.score).toBeLessThan(60);
+    expect(insight.signals.map((signal) => signal.kind)).toEqual(
+      expect.arrayContaining(["high_cost", "tool_loop", "file_blast", "error_pressure"]),
+    );
+  });
+
   it("scores every input session and marks healthy sessions green", () => {
     const risky = makeJourney("j-risk", {
       tokenUsage: { input: 12000, output: 1000, reasoning: 0, cachedInput: 0, total: 13000 },
@@ -68,7 +116,7 @@ describe("journey insights", () => {
       eventIds: ["red-prompt", "red-change", "red-error"],
     });
     const yellow = makeJourney("j-yellow", {
-      eventIds: ["yellow-prompt", "yellow-tool-1", "yellow-tool-2", "yellow-tool-3", "yellow-tool-4"],
+      eventIds: ["yellow-prompt", "yellow-change"],
     });
     const green = makeJourney("j-green", {
       eventIds: ["green-prompt", "green-change", "green-test"],
@@ -78,10 +126,7 @@ describe("journey insights", () => {
       ["red-change", event("red-change", "file_change", "Code", "Patch", { files: ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"] })],
       ["red-error", event("red-error", "error", "Risks", "Failed", { status: "failed" })],
       ["yellow-prompt", event("yellow-prompt", "user_prompt", "Product", "Yellow")],
-      ["yellow-tool-1", event("yellow-tool-1", "tool_call", "Code", "Read", { toolName: "exec_command" })],
-      ["yellow-tool-2", event("yellow-tool-2", "tool_call", "Code", "Read", { toolName: "exec_command" })],
-      ["yellow-tool-3", event("yellow-tool-3", "tool_call", "Code", "Read", { toolName: "exec_command" })],
-      ["yellow-tool-4", event("yellow-tool-4", "tool_call", "Code", "Read", { toolName: "exec_command" })],
+      ["yellow-change", event("yellow-change", "file_change", "Code", "Patch")],
       ["green-prompt", event("green-prompt", "user_prompt", "Product", "Green")],
       ["green-change", event("green-change", "file_change", "Code", "Patch")],
       ["green-test", event("green-test", "verification", "Verification", "Tests passed")],
@@ -91,10 +136,11 @@ describe("journey insights", () => {
     expect(buildJourneyInsights([green, yellow], events, 3).map((insight) => insight.journeyId)).toEqual(["j-yellow"]);
   });
 
-  it("ranks selected attention sessions by lowest health score first", () => {
-    const risky = makeJourney("j-risk", {
-      tokenUsage: { input: 12000, output: 1000, reasoning: 0, cachedInput: 0, total: 13000 },
-      eventIds: ["risk-prompt", "risk-change"],
+  it("ranks selected red sessions by lowest health score first", () => {
+    const red = makeJourney("j-red", {
+      status: "failed",
+      tokenUsage: { input: 20000, output: 4000, reasoning: 0, cachedInput: 0, total: 24000 },
+      eventIds: ["red-prompt", "red-error"],
     });
     const veryRisky = makeJourney("j-very-risk", {
       status: "failed",
@@ -102,16 +148,16 @@ describe("journey insights", () => {
       eventIds: ["very-prompt", "very-change", "very-error"],
     });
     const events = new Map([
-      ["risk-prompt", event("risk-prompt", "user_prompt", "Product", "Risky")],
-      ["risk-change", event("risk-change", "file_change", "Code", "Patch")],
+      ["red-prompt", event("red-prompt", "user_prompt", "Product", "Red")],
+      ["red-error", event("red-error", "error", "Risks", "Failed", { status: "failed" })],
       ["very-prompt", event("very-prompt", "user_prompt", "Product", "Very risky")],
       ["very-change", event("very-change", "file_change", "Code", "Patch", { files: ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"] })],
       ["very-error", event("very-error", "error", "Risks", "Failed", { status: "failed" })],
     ]);
 
-    const insights = buildJourneyInsights([risky, veryRisky], events, 3);
+    const insights = buildJourneyInsights([red, veryRisky], events, 3);
 
-    expect(insights.map((insight) => insight.journeyId)).toEqual(["j-very-risk", "j-risk"]);
+    expect(insights.map((insight) => insight.journeyId)).toEqual(["j-very-risk", "j-red"]);
     expect(insights[0].score).toBeLessThan(insights[1].score);
   });
 });
