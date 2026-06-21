@@ -67,6 +67,8 @@ import {
 import { DailyTokenUsagePanel } from "./DailyTokenUsagePanel";
 import { resolveAutoSelectId } from "./autoSelect";
 import { AppCopy, COPY, IngestCopy, Language, TourCopy, normalizeLanguage } from "./i18n";
+import { buildJourneyInsights } from "./insights";
+import type { InsightSignalKind, JourneyInsight } from "./insights";
 import { formatMillionTokens } from "./tokenFormat";
 import {
   aggregateCostByModel,
@@ -1443,6 +1445,10 @@ function ConversationThread({
     () => applySearchAndSort(journeys, searchQuery, sortKey, pricing),
     [journeys, searchQuery, sortKey, pricing],
   );
+  const insights = useMemo(
+    () => buildJourneyInsights(orderedJourneys, timelineEventsById),
+    [orderedJourneys, timelineEventsById],
+  );
   const [selectedJourneyId, setSelectedJourneyId] = useState<string | null>(
     null,
   );
@@ -1592,6 +1598,12 @@ function ConversationThread({
             <option value="errors">{copy.sortErrors}</option>
           </select>
         </div>
+        <InsightBoard
+          copy={copy}
+          insights={insights}
+          activeJourneyId={selectedJourney?.id ?? null}
+          onSelectJourney={setSelectedJourneyId}
+        />
         <div className="conversation-master-list" ref={masterListRef}>
           {orderedJourneys.map((journey) => (
             <ConversationMasterItem
@@ -1704,6 +1716,92 @@ function ConversationThread({
       ) : null}
     </div>
   );
+}
+
+function InsightBoard({
+  copy,
+  insights,
+  activeJourneyId,
+  onSelectJourney,
+}: {
+  copy: AppCopy["timeline"];
+  insights: JourneyInsight[];
+  activeJourneyId: string | null;
+  onSelectJourney: (journeyId: string) => void;
+}) {
+  return (
+    <section className="insight-board" aria-label={copy.insightBoardAria}>
+      <div className="insight-board-heading">
+        <span>
+          <Zap size={13} />
+          {copy.insightBoardTitle}
+        </span>
+        <em>{insights.length}</em>
+      </div>
+      {insights.length === 0 ? (
+        <p>{copy.insightBoardEmpty}</p>
+      ) : (
+        <div className="insight-list">
+          {insights.map((insight) => (
+            <button
+              key={insight.id}
+              type="button"
+              className={`insight-card ${insight.severity} ${insight.journeyId === activeJourneyId ? "active" : ""}`}
+              onClick={() => onSelectJourney(insight.journeyId)}
+              aria-current={insight.journeyId === activeJourneyId ? "true" : undefined}
+            >
+              <span className="insight-score">
+                {copy.insightScore}
+                <strong>{Math.round(insight.score)}</strong>
+              </span>
+              <span className="insight-copy">
+                <strong>{copy.insightSignals[insight.primaryKind]}</strong>
+                <em>{insight.title}</em>
+              </span>
+              <span className="insight-metrics">
+                <span>{formatMillionTokens(insight.metrics.tokens)} {copy.tokens}</span>
+                <span>{insight.metrics.toolCalls} {copy.insightTools}</span>
+                <span>{insight.metrics.files} {copy.insightFiles}</span>
+              </span>
+              <span className="insight-reasons">
+                {insight.signals
+                  .filter((signal) => signal.kind !== "high_cost")
+                  .slice(0, 3)
+                  .map((signal) => (
+                    <b key={signal.kind}>
+                      {formatInsightSignal(copy, signal.kind, signal.metric)}
+                    </b>
+                  ))}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatInsightSignal(
+  copy: AppCopy["timeline"],
+  kind: InsightSignalKind,
+  metric: number,
+) {
+  switch (kind) {
+    case "missing_verification":
+      return copy.insightReasonMissingVerification;
+    case "failed_run":
+      return copy.insightReasonFailedRun;
+    case "tool_loop":
+      return copy.insightReasonToolLoop(metric);
+    case "high_cost":
+      return copy.insightReasonHighCost(formatMillionTokens(metric));
+    case "file_blast":
+      return copy.insightReasonFileBlast(metric);
+    case "error_pressure":
+      return copy.insightReasonErrorPressure(metric);
+    case "context_churn":
+      return copy.insightReasonContextChurn(metric);
+  }
 }
 
 function ConversationMasterItem({

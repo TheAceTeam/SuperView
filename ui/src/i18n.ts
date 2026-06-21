@@ -1,3 +1,5 @@
+import type { InsightSignalKind } from "./insights";
+
 export type Language = "en" | "zh-CN";
 export type TokenChartCopy = {
   defaultTitle: string;
@@ -99,6 +101,20 @@ export type AppCopy = {
     statusLegendSuccess: string;
     statusLegendFailed: string;
     detailTabsAria: string;
+    insightBoardAria: string;
+    insightBoardTitle: string;
+    insightBoardEmpty: string;
+    insightScore: string;
+    insightTools: string;
+    insightFiles: string;
+    insightSignals: Record<InsightSignalKind, string>;
+    insightReasonMissingVerification: string;
+    insightReasonFailedRun: string;
+    insightReasonToolLoop: (count: number) => string;
+    insightReasonHighCost: (tokens: string) => string;
+    insightReasonFileBlast: (count: number) => string;
+    insightReasonErrorPressure: (count: number) => string;
+    insightReasonContextChurn: (count: number) => string;
     conversationTab: string;
     contextReplayTab: string;
     contextReplayLedgerAria: string;
@@ -375,6 +391,28 @@ export const COPY: Record<Language, AppCopy> = {
       statusLegendSuccess: "Success",
       statusLegendFailed: "Failed",
       detailTabsAria: "Thread detail tabs",
+      insightBoardAria: "High-signal task insights",
+      insightBoardTitle: "Insight Board",
+      insightBoardEmpty: "No high-risk runs detected.",
+      insightScore: "score",
+      insightTools: "tools",
+      insightFiles: "files",
+      insightSignals: {
+        missing_verification: "Patch lacks verification",
+        failed_run: "Failed run",
+        tool_loop: "Tool loop pressure",
+        high_cost: "High token burn",
+        file_blast: "Wide file impact",
+        error_pressure: "Error pressure",
+        context_churn: "Context churn",
+      },
+      insightReasonMissingVerification: "no verification after patch",
+      insightReasonFailedRun: "run ended failed",
+      insightReasonToolLoop: (count: number) => `${count} repeated tool calls`,
+      insightReasonHighCost: (tokens: string) => `${tokens} tokens`,
+      insightReasonFileBlast: (count: number) => `${count} files touched`,
+      insightReasonErrorPressure: (count: number) => `${count} error signals`,
+      insightReasonContextChurn: (count: number) => `${count} context events`,
       conversationTab: "Conversation",
       contextReplayTab: "Context Replay",
       contextReplayLedgerAria: "Context Replay ledger",
@@ -733,6 +771,28 @@ export const COPY: Record<Language, AppCopy> = {
       statusLegendSuccess: "成功",
       statusLegendFailed: "失败",
       detailTabsAria: "Thread 详情标签",
+      insightBoardAria: "高信号任务洞察",
+      insightBoardTitle: "洞察面板",
+      insightBoardEmpty: "未检测到高风险运行。",
+      insightScore: "分数",
+      insightTools: "工具",
+      insightFiles: "文件",
+      insightSignals: {
+        missing_verification: "代码变更缺少验证",
+        failed_run: "运行失败",
+        tool_loop: "工具循环压力",
+        high_cost: "Token 消耗偏高",
+        file_blast: "文件影响面较广",
+        error_pressure: "错误压力",
+        context_churn: "上下文 churn",
+      },
+      insightReasonMissingVerification: "patch 后没有验证",
+      insightReasonFailedRun: "运行以失败结束",
+      insightReasonToolLoop: (count: number) => `${count} 次重复工具调用`,
+      insightReasonHighCost: (tokens: string) => `${tokens} tokens`,
+      insightReasonFileBlast: (count: number) => `影响 ${count} 个文件`,
+      insightReasonErrorPressure: (count: number) => `${count} 条错误信号`,
+      insightReasonContextChurn: (count: number) => `${count} 个上下文事件`,
       conversationTab: "Conversation",
       contextReplayTab: "Context Replay",
       contextReplayLedgerAria: "Context Replay ledger",

@@ -1047,6 +1047,8 @@ select {
 .conversation-master {
   position: sticky;
   top: 88px;
+  display: flex;
+  flex-direction: column;
   max-height: calc(100vh - 112px);
   overflow: hidden;
   background: var(--surface-soft);
@@ -1162,8 +1164,9 @@ select {
 
 .conversation-master-list {
   display: grid;
+  flex: 1 1 auto;
   gap: 6px;
-  max-height: calc(100vh - 166px);
+  min-height: 0;
   overflow: auto;
   padding: 8px;
 }
@@ -1173,8 +1176,7 @@ select {
   min-width: 0;
   gap: 6px;
   padding: 10px 11px;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--orange);
+  border: 1px solid color-mix(in srgb, var(--orange) 26%, var(--line));
   border-radius: 8px;
   background: var(--surface);
   color: var(--ink);
@@ -1191,11 +1193,12 @@ select {
 }
 
 .conversation-master-item.failed {
-  border-left-color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 46%, var(--line));
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
 }
 
 .conversation-master-item.success {
-  border-left-color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 34%, var(--line));
 }
 
 .conversation-master-item span {
@@ -3797,6 +3800,7 @@ pre {
 /* ── Master Search / Sort ── */
 
 .conversation-master-search {
+  flex: 0 0 auto;
   display: flex;
   gap: 6px;
   padding: 6px 8px 4px;
@@ -3830,6 +3834,173 @@ pre {
   color: var(--ink);
   font-size: 11px;
   font-weight: 700;
+}
+
+/* ── Insight Board ── */
+
+.insight-board {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 8px;
+  margin: 4px 8px 2px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--orange) 24%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--orange-soft) 24%, var(--surface-2));
+}
+
+.insight-board-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.insight-board-heading span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.insight-board-heading em {
+  display: inline-grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--surface-2);
+  font: 900 10px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.insight-board p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.insight-list {
+  display: grid;
+  gap: 7px;
+}
+
+.insight-card {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 6px 9px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: left;
+}
+
+.insight-card:hover,
+.insight-card.active,
+.insight-card[aria-current="true"] {
+  border-color: color-mix(in srgb, var(--orange) 58%, var(--line));
+  background: color-mix(in srgb, var(--orange-soft) 44%, var(--surface-2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange) 14%, transparent);
+}
+
+.insight-card.high {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--line));
+}
+
+.insight-card.medium {
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--line));
+}
+
+.insight-score {
+  grid-row: 1 / span 3;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  min-height: 54px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ink) 8%, var(--surface-soft));
+  color: var(--muted);
+  font: 800 9px/1 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  text-transform: uppercase;
+}
+
+.insight-score strong {
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.insight-card.high .insight-score strong {
+  color: var(--danger);
+}
+
+.insight-card.medium .insight-score strong {
+  color: var(--warning);
+}
+
+.insight-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.insight-copy strong {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.insight-copy em {
+  display: -webkit-box;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.25;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.insight-metrics,
+.insight-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.insight-metrics span,
+.insight-reasons b {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.insight-metrics span {
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.insight-reasons b {
+  background: color-mix(in srgb, var(--orange-soft) 58%, var(--surface));
+  color: var(--ink);
+  font-weight: 800;
 }
 
 /* ── Dropzone Overlay ── */
