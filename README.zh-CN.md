@@ -27,6 +27,25 @@ ccflight --project-dir=/path/to/project
 
 SuperView 是一个本地优先的 coding agent 飞行记录器。它会读取 Codex、Claude Code 和 OpenCode 的 session 日志，重建每一轮任务旅程，并将隐藏的 agent 工作——上下文快照、工具调用、成本、错误和项目遥测——呈现在一个统一的仪表盘中。
 
+## 包名迁移
+
+npm 包名现在是 `cc-flight`。旧包名 `@seanxdo/superview` 会作为兼容包继续保留，避免已有安装立即失效。
+
+新安装建议使用：
+
+```bash
+npx cc-flight
+```
+
+迁移期间，旧命令仍然可用：
+
+```bash
+npx @seanxdo/superview
+superview
+```
+
+后续脚本和文档建议统一切换到 `cc-flight` 或 `ccflight`。
+
 ## 界面预览
 
 <table>
@@ -163,7 +182,18 @@ pnpm build        # 类型检查并构建 UI
 pnpm typecheck    # 运行 TypeScript 检查
 pnpm test         # 运行 Vitest 测试
 pnpm test:e2e     # 运行 Playwright 测试
+pnpm publish:dual # 构建并 dry-run 发布 cc-flight + 兼容包
 ```
+
+### 发布
+
+```bash
+pnpm publish:dual       # 构建、打包，并 dry-run 两个 npm 包
+pnpm publish:dual:live  # 构建、打包，并正式发布 cc-flight + @seanxdo/superview
+```
+
+如需 dry-run 到非 `latest` 标签，可运行 `pnpm publish:dual -- --tag next`。正式发布会先发布 `cc-flight`，再将同一个打包产物改写为旧包名 `@seanxdo/superview` 兼容包后发布。
+如果 npm 要求双因素认证，可运行 `pnpm publish:dual:live -- --otp <code>`。
 
 ## API Reference
 

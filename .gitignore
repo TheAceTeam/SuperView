@@ -9,3 +9,4 @@ playwright-report/
 .DS_Store
 .gstack/
 .superpowers/
+.claude/

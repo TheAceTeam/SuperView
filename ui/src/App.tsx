@@ -735,7 +735,7 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <strong>SuperView</strong>
+          <strong>CC Flight</strong>
           <span>{copy.brandSubtitle}</span>
         </div>
         <div className="topbar-actions">

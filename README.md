@@ -27,6 +27,25 @@ Then open **http://127.0.0.1:5174** and scan your agent logs.
 
 SuperView is a local-first flight recorder for coding agents. It ingests session logs from Codex, Claude Code, and OpenCode, reconstructs every task journey, and surfaces hidden agent work — context snapshots, tool calls, cost, errors, and project telemetry — in a single dashboard.
 
+## Package Rename
+
+The npm package is now `cc-flight`. The old package name, `@seanxdo/superview`, remains available as a compatibility package for existing installs.
+
+New installs should use:
+
+```bash
+npx cc-flight
+```
+
+Existing commands still work during the transition:
+
+```bash
+npx @seanxdo/superview
+superview
+```
+
+For future updates, switch scripts and docs to `cc-flight` or `ccflight`.
+
 ## Preview
 
 <table>
@@ -163,7 +182,18 @@ pnpm build        # Typecheck and build the UI
 pnpm typecheck    # Run TypeScript checks
 pnpm test         # Run Vitest tests
 pnpm test:e2e     # Run Playwright tests
+pnpm publish:dual # Build and dry-run publishing cc-flight + legacy package
 ```
+
+### Publishing
+
+```bash
+pnpm publish:dual       # Build, pack, and dry-run both npm packages
+pnpm publish:dual:live  # Build, pack, and publish cc-flight + @seanxdo/superview
+```
+
+Use `pnpm publish:dual -- --tag next` to dry-run with a non-`latest` npm dist-tag. The live command publishes `cc-flight` first, then republishes the same packed artifact as the legacy `@seanxdo/superview` compatibility package.
+If npm requires two-factor authentication, run `pnpm publish:dual:live -- --otp <code>`.
 
 ## API Reference
 

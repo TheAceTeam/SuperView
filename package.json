@@ -1,12 +1,12 @@
 {
   "name": "cc-flight",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "description": "Flight recorder for Claude Code and coding agents — timeline dashboard with replayable agent-run drill-downs.",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/TheAceTeam/SuperView.git"
+    "url": "git+https://github.com/TheAceTeam/CC-Flight.git"
   },
   "keywords": [
     "cc",
@@ -40,6 +40,8 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "ingest": "tsx runtime-node/cli-ingest.ts",
+    "publish:dual": "node scripts/publish-dual-packages.mjs",
+    "publish:dual:live": "node scripts/publish-dual-packages.mjs --publish",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
